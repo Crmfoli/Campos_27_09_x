@@ -1,25 +1,28 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 import pandas as pd
+import os
 
 app = Flask(__name__)
 
-# Página inicial (login)
+# rota principal
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("dados.html")
 
-# Página do mapa
-@app.route("/mapa")
-def mapa():
-    return render_template("mapa.html")
-
-# Página de dados (lê últimos 20 registros do Excel)
-@app.route("/dados")
-def dados():
-    df = pd.read_excel("dados_sensores.xlsx")
-    ultimos = df.tail(20).to_dict(orient="records")
-    colunas = df.columns.tolist()
-    return render_template("dados.html", dados=ultimos, colunas=colunas)
+# rota para fornecer os dados em JSON
+@app.route("/dados_json")
+def dados_json():
+    excel_path = os.path.join(os.getcwd(), "dados_sensores.xlsx")
+    
+    try:
+        df = pd.read_excel(excel_path)
+        # pega só os 10 últimos registros
+        df = df.tail(10)
+        data = df.to_dict(orient="records")
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"erro": str(e)})
 
 if __name__ == "__main__":
     app.run(debug=True)
+
