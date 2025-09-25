@@ -4,266 +4,196 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dados dos Sensores</title>
-    <!-- Adicionada a biblioteca do Chart.js para criar gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            margin: 0;
-            padding: 0;
-        }
-        header {
-            background-color: #007bff;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 22px;
-        }
-        .container {
-            width: 90%;
-            margin: 20px auto;
-        }
-        .grafico-container {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        table th, table td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-        }
-        table th {
-            background-color: #007bff;
-            color: white;
-        }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            font-size: 18px;
-            color: #333;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
+        header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
+        .container { width: 90%; margin: 20px auto; }
+        .grafico-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table th, table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        table th { background-color: #007bff; color: white; }
+        .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
+        h2 { text-align: center; color: #333; font-weight: 500; }
     </style>
 </head>
 <body>
-    <header>📊 Últimos Dados dos Sensores</header>
+    <header>📊 Dados de Monitoramento</header>
 
     <div class="container">
-        <!-- Elemento Canvas para o gráfico -->
+        <!-- Gráfico para o novo arquivo (pluviometria, sucção, temperatura) -->
         <div class="grafico-container">
-            <canvas id="meuGrafico"></canvas>
+            <h2>Estação Meteorológica</h2>
+            <canvas id="graficoPluviometria"></canvas>
         </div>
 
-        <!-- Tabela de dados -->
+        <!-- Gráfico para os sensores de umidade -->
+        <div class="grafico-container">
+            <h2>Umidade do Solo</h2>
+            <canvas id="graficoSensores"></canvas>
+        </div>
+
         <div id="tabela-container">
-            <div class="loading">A carregar estrutura...</div>
+            <div class="loading">A carregar dados...</div>
         </div>
     </div>
 
     <script>
-        let todosOsDados = []; 
-        let indiceAtual = 0;    
-        let dadosNaTela = [];   
-        let intervalId = null;  
-        let meuGrafico = null; 
+        // --- Variáveis e Configurações Globais ---
+        let todosOsDadosSensores = [], indiceAtualSensores = 0, dadosNaTelaSensores = [], graficoSensores = null;
+        let todosOsDadosPluviometria = [], indiceAtualPluviometria = 0, dadosNaTelaPluviometria = [], graficoPluviometria = null;
+        let intervalId = null;
 
-        const ESTILOS_GRAFICO = [
-            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' },
-            { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },
-            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' },
-            { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },
-            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' },
-            { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
+        // Estilos para o gráfico de SENSORES DE UMIDADE
+        const ESTILOS_SENSORES = [
+            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' }, { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },
+            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' }, { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },
+            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' }, { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
+        const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
 
-        const LABELS_PROFUNDIDADE = [
-            'Profundidade 0,3 m',
-            'Profundidade 0,8 m',
-            'Profundidade 1,5 m',
-            'Profundidade 2,0 m',
-            'Profundidade 2,5 m'
+        // ALTERAÇÃO: Estilos para o novo gráfico da ESTAÇÃO METEOROLÓGICA
+        const ESTILOS_ESTACAO = [
+            { color: 'rgb(54, 162, 235)', pointStyle: 'rect' },    // Precipitação
+            { color: 'rgb(75, 192, 192)', pointStyle: 'triangle' },// Sucção
+            { color: 'rgb(255, 99, 132)', pointStyle: 'star' }     // °C Temp_Solo
         ];
 
         const verticalLinePlugin = {
           id: 'verticalLine',
-          afterDraw: (chart) => {
-            if (chart.tooltip?._active?.length) {
-              const ctx = chart.ctx;
-              const x = chart.tooltip._active[0].element.x;
-              const topY = chart.scales.y.top;
-              const bottomY = chart.scales.y.bottom;
-
-              ctx.save();
-              ctx.beginPath();
-              ctx.moveTo(x, topY);
-              ctx.lineTo(x, bottomY);
-              ctx.lineWidth = 1;
-              ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-              ctx.stroke();
-              ctx.restore();
-            }
-          }
+          afterDraw: (chart) => { if (chart.tooltip?._active?.length) { const ctx = chart.ctx; const x = chart.tooltip._active[0].element.x; const topY = chart.scales.y.top; const bottomY = chart.scales.y.bottom; ctx.save(); ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; ctx.stroke(); ctx.restore(); } }
         };
+        
+        // --- Funções de Carregamento e Inicialização ---
 
-        // ALTERAÇÃO: Função principal que carrega a página em etapas
-        async function iniciarPagina() {
+        async function carregarTodosOsDados() {
             try {
-                // Etapa 1: Buscar o cabeçalho para construir a UI imediatamente
-                const responseCabecalho = await fetch("/dados_cabecalho");
-                const cabecalho = await responseCabecalho.json();
+                // Carrega os dois conjuntos de dados em paralelo
+                const [responseSensores, responsePluviometria] = await Promise.all([
+                    fetch("/dados_json"),
+                    fetch("/pluviometria_json")
+                ]);
+                todosOsDadosSensores = await responseSensores.json();
+                todosOsDadosPluviometria = await responsePluviometria.json();
 
-                if (cabecalho.error || !Array.isArray(cabecalho)) {
-                    document.getElementById("tabela-container").innerHTML = 
-                        `<div class="loading">Erro ao carregar estrutura: ${cabecalho.error || 'Formato inválido'}</div>`;
+                if (todosOsDadosSensores.error || todosOsDadosPluviometria.error) {
+                    document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro: ${todosOsDadosSensores.error || todosOsDadosPluviometria.error}</div>`;
                     return;
                 }
-
-                // Etapa 2: Criar a tabela e o gráfico vazios
-                criarTabelaComCabecalho(cabecalho);
-                iniciarGrafico(cabecalho);
                 
-                // Etapa 3: Buscar todos os dados em segundo plano
-                const responseDados = await fetch("/dados_json");
-                const data = await responseDados.json();
-
-                if (data.error || !Array.isArray(data)) {
-                    document.querySelector("#tabela-container table tbody").innerHTML = 
-                        `<tr><td colspan="${cabecalho.length}" class="loading">Erro ao carregar dados: ${data.error || 'Formato inválido'}</td></tr>`;
-                    return;
-                }
-                if (data.length === 0) {
-                    document.querySelector("#tabela-container table tbody").innerHTML = 
-                        `<tr><td colspan="${cabecalho.length}" class="loading">Nenhum dado para exibir.</td></tr>`;
-                    return;
-                }
-
-                // Etapa 4: Iniciar a animação
-                todosOsDados = data;
-                document.querySelector("#tabela-container table tbody").innerHTML = ''; // Limpa a mensagem de "carregando"
+                // Inicia as visualizações
+                iniciarVisualizacaoSensores();
+                iniciarVisualizacaoPluviometria();
+                
                 intervalId = setInterval(adicionarProximoDado, 2000);
 
             } catch (error) {
-                document.getElementById("tabela-container").innerHTML = 
-                    `<div class="loading">Erro de conexão: ${error}</div>`;
+                document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro de conexão: ${error}</div>`;
             }
         }
 
-        // ALTERAÇÃO: Agora aceita um array de nomes de colunas
-        function criarTabelaComCabecalho(colunas) {
-            const container = document.getElementById('tabela-container');
-            const tabelaHTML = `
-                <table>
-                    <thead>
-                        <tr>
-                            ${colunas.map(col => `<th>${col}</th>`).join('')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                         <tr>
-                            <td colspan="${colunas.length}" class="loading">A carregar dados...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-            container.innerHTML = tabelaHTML;
+        function iniciarVisualizacaoSensores() {
+            const cabecalho = Object.keys(todosOsDadosSensores[0]);
+            criarTabelaComCabecalho(cabecalho);
+            iniciarGraficoSensores(cabecalho);
         }
 
-        // ALTERAÇÃO: Agora aceita um array de nomes de colunas
-        function iniciarGrafico(colunas) {
-            const ctx = document.getElementById('meuGrafico').getContext('2d');
-            const colunasDeDados = colunas.slice(1); 
-            
-            const datasets = colunasDeDados.map((coluna, index) => {
-                const estilo = ESTILOS_GRAFICO[index % ESTILOS_GRAFICO.length];
-                return {
-                    label: LABELS_PROFUNDIDADE[index] || coluna, 
-                    data: [],
-                    borderColor: estilo.color,
-                    backgroundColor: estilo.color,
-                    pointStyle: estilo.pointStyle,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    tension: 0.1,
-                    fill: false
-                };
-            });
+        function iniciarVisualizacaoPluviometria() {
+            const cabecalho = Object.keys(todosOsDadosPluviometria[0]);
+            iniciarGraficoPluviometria(cabecalho);
+        }
 
-            meuGrafico = new Chart(ctx, {
-                type: 'line',
-                data: { labels: [], datasets: datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    interaction: { mode: 'index', intersect: false, },
-                    plugins: { tooltip: { enabled: true }, legend: { position: 'bottom' } },
-                    scales: {
-                        x: { ticks: { maxRotation: 45, minRotation: 45 } },
-                        y: { title: { display: true, text: 'Umidade Volumetrica (%)' } }
-                    }
-                },
+        function criarTabelaComCabecalho(colunas) {
+            const container = document.getElementById('tabela-container');
+            container.innerHTML = `<h2>Dados dos Sensores de Umidade</h2><table><thead><tr>${colunas.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
+        }
+
+        // --- Funções dos Gráficos ---
+
+        function iniciarGraficoSensores(colunas) {
+            const ctx = document.getElementById('graficoSensores').getContext('2d');
+            const datasets = colunas.slice(1).map((col, i) => ({
+                label: LABELS_PROFUNDIDADE[i] || col, data: [], borderColor: ESTILOS_SENSORES[i].color, backgroundColor: ESTILOS_SENSORES[i].color,
+                pointStyle: ESTILOS_SENSORES[i].pointStyle, pointRadius: 5, pointHoverRadius: 7, tension: 0.1, fill: false
+            }));
+            graficoSensores = new Chart(ctx, {
+                type: 'line', data: { labels: [], datasets: datasets },
+                options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Umidade Volumetrica (%)' } } } },
                 plugins: [verticalLinePlugin]
             });
         }
 
-        function adicionarProximoDado() {
-            if (indiceAtual >= todosOsDados.length) {
-                clearInterval(intervalId);
-                return;
-            }
-            const novoDado = todosOsDados[indiceAtual];
-            dadosNaTela.unshift(novoDado); 
-            if (dadosNaTela.length > 10) {
-                dadosNaTela.pop();
-            }
-            renderizarTabela(); 
-            atualizarGrafico(); 
-            indiceAtual++;      
+        // ALTERAÇÃO: Gráfico de linha para múltiplos dados da estação
+        function iniciarGraficoPluviometria(colunas) {
+            const ctx = document.getElementById('graficoPluviometria').getContext('2d');
+            const datasets = colunas.slice(1).map((col, i) => ({
+                label: col, data: [], borderColor: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].color, backgroundColor: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].color,
+                pointStyle: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].pointStyle, pointRadius: 5, pointHoverRadius: 7, tension: 0.1, fill: false
+            }));
+            graficoPluviometria = new Chart(ctx, {
+                type: 'line', // Alterado para 'line'
+                data: { labels: [], datasets: datasets },
+                options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Valores' }, beginAtZero: false } } },
+                plugins: [verticalLinePlugin]
+            });
         }
 
-        function renderizarTabela() {
+        // --- Funções de Atualização (Loop) ---
+
+        function adicionarProximoDado() {
+            let continuar = false;
+            // Atualiza dados dos sensores
+            if (indiceAtualSensores < todosOsDadosSensores.length) {
+                dadosNaTelaSensores.unshift(todosOsDadosSensores[indiceAtualSensores++]); 
+                if (dadosNaTelaSensores.length > 10) dadosNaTelaSensores.pop();
+                continuar = true;
+            }
+            // Atualiza dados da estação
+            if (indiceAtualPluviometria < todosOsDadosPluviometria.length) {
+                dadosNaTelaPluviometria.unshift(todosOsDadosPluviometria[indiceAtualPluviometria++]);
+                if (dadosNaTelaPluviometria.length > 10) dadosNaTelaPluviometria.pop();
+                continuar = true;
+            }
+
+            renderizarTabelaSensores(); 
+            atualizarGraficoSensores();
+            atualizarGraficoPluviometria();
+
+            if (!continuar) clearInterval(intervalId);
+        }
+
+        function renderizarTabelaSensores() {
             const tbody = document.querySelector("#tabela-container table tbody");
             if (!tbody) return;
-            tbody.innerHTML = ''; 
-            dadosNaTela.forEach(linha => {
-                const tr = document.createElement('tr');
-                const valores = Object.values(linha);
-                tr.innerHTML = valores.map(val => `<td>${val === null ? '' : val}</td>`).join('');
-                tbody.appendChild(tr);
-            });
+            tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
         }
 
-        function atualizarGrafico() {
-            if (!meuGrafico || dadosNaTela.length === 0) return;
-            const dadosParaGrafico = [...dadosNaTela].reverse();
+        function atualizarGraficoSensores() {
+            if (!graficoSensores || dadosNaTelaSensores.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaSensores].reverse();
             const labelKey = Object.keys(dadosParaGrafico[0])[0];
-            const labels = dadosParaGrafico.map(d => d[labelKey]);
-            const colunasDeDados = Object.keys(dadosParaGrafico[0]).slice(1);
-            meuGrafico.data.labels = labels;
-            colunasDeDados.forEach((coluna, index) => {
-                const dataPoints = dadosParaGrafico.map(d => d[coluna]);
-                if (meuGrafico.data.datasets[index]) {
-                    meuGrafico.data.datasets[index].data = dataPoints;
-                }
+            graficoSensores.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            Object.keys(dadosParaGrafico[0]).slice(1).forEach((coluna, index) => {
+                if (graficoSensores.data.datasets[index])
+                    graficoSensores.data.datasets[index].data = dadosParaGrafico.map(d => d[coluna]);
             });
-            meuGrafico.update(); 
+            graficoSensores.update(); 
         }
 
-        // Inicia o novo processo de carregamento
-        iniciarPagina();
+        // ALTERAÇÃO: Atualiza todas as linhas do gráfico da estação
+        function atualizarGraficoPluviometria() {
+            if (!graficoPluviometria || dadosNaTelaPluviometria.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaPluviometria].reverse();
+            const labelKey = Object.keys(dadosParaGrafico[0])[0];
+            graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            Object.keys(dadosParaGrafico[0]).slice(1).forEach((coluna, index) => {
+                if (graficoPluviometria.data.datasets[index])
+                    graficoPluviometria.data.datasets[index].data = dadosParaGrafico.map(d => d[coluna]);
+            });
+            graficoPluviometria.update();
+        }
+        
+        carregarTodosOsDados();
     </script>
 </body>
 </html>
-
-
-
-
-
