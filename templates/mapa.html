@@ -38,36 +38,21 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Coordenadas fornecidas
     const localizacao = [-22.741620, -45.598395];
-
-    // Cria o mapa
     const map = L.map('map').setView(localizacao, 15);
 
-    // Camada do mapa (openstreetmap grátis)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
       maxZoom: 19,
     }).addTo(map);
 
-    // Cria o marcador
     const marker = L.marker(localizacao).addTo(map);
 
-    // Evento de clique no marcador
     marker.on('click', () => {
-      window.location.href = "dados.html"; // redireciona ao clicar no pino
+      window.location.href = "dados.html"; // abre página de dados
     });
 
-    // Tooltip alterada
     marker.bindPopup("<b>Sensor</b>").openPopup();
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
