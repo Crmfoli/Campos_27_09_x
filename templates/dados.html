@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -85,7 +85,15 @@
             { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
 
-        // NOVO: Plugin para desenhar a linha vertical no gráfico
+        // ALTERAÇÃO: Lista fixa com as legendas corretas para o gráfico
+        const LABELS_PROFUNDIDADE = [
+            'Profundidade 0,3 m',
+            'Profundidade 0,8 m',
+            'Profundidade 1,5 m',
+            'Profundidade 2,0 m',
+            'Profundidade 2,5 m'
+        ];
+
         const verticalLinePlugin = {
           id: 'verticalLine',
           afterDraw: (chart) => {
@@ -106,15 +114,6 @@
             }
           }
         };
-
-        function formatarNomeColuna(nome) {
-            if (nome && nome.toLowerCase().startsWith('prof')) {
-                const partes = nome.split('_');
-                const valor = partes.slice(1, -1).join('.');
-                return `Profundidade ${valor} m`;
-            }
-            return nome;
-        }
 
         async function iniciarAnimacao() {
             try {
@@ -166,7 +165,8 @@
             const datasets = colunasDeDados.map((coluna, index) => {
                 const estilo = ESTILOS_GRAFICO[index % ESTILOS_GRAFICO.length];
                 return {
-                    label: formatarNomeColuna(coluna), 
+                    // ALTERAÇÃO: Usa a lista de legendas fixas
+                    label: LABELS_PROFUNDIDADE[index] || coluna, 
                     data: [],
                     borderColor: estilo.color,
                     backgroundColor: estilo.color,
@@ -196,7 +196,6 @@
                         legend: { position: 'bottom' }
                     },
                     scales: {
-                        // ALTERAÇÃO: Rotação dos rótulos do eixo X
                         x: {
                             ticks: {
                                 maxRotation: 45,
@@ -211,7 +210,6 @@
                         }
                     }
                 },
-                // ALTERAÇÃO: Registo do novo plugin
                 plugins: [verticalLinePlugin]
             });
         }
@@ -263,6 +261,7 @@
     </script>
 </body>
 </html>
+
 
 
 
