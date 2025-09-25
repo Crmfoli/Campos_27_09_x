@@ -45,8 +45,7 @@ def dados():
 def dados_json():
     try:
         df = pd.read_excel(EXCEL_FILE)
-        # Últimos 10 dados
-        df = df.tail(10)
+        # Removemos o '.tail(10)' para pegar todos os dados, do mais antigo ao mais novo
         return jsonify(df.to_dict(orient="records"))
     except Exception as e:
         return jsonify({"error": str(e)})
@@ -54,5 +53,3 @@ def dados_json():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
