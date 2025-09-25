@@ -65,7 +65,7 @@
 
         <!-- Tabela de dados -->
         <div id="tabela-container">
-            <div class="loading">A iniciar a visualização em tempo real...</div>
+            <div class="loading">A carregar estrutura...</div>
         </div>
     </div>
 
@@ -85,7 +85,6 @@
             { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
 
-        // ALTERAÇÃO: Lista fixa com as legendas corretas para o gráfico
         const LABELS_PROFUNDIDADE = [
             'Profundidade 0,3 m',
             'Profundidade 0,8 m',
@@ -115,25 +114,41 @@
           }
         };
 
-        async function iniciarAnimacao() {
+        // ALTERAÇÃO: Função principal que carrega a página em etapas
+        async function iniciarPagina() {
             try {
-                const response = await fetch("/dados_json");
-                const data = await response.json();
+                // Etapa 1: Buscar o cabeçalho para construir a UI imediatamente
+                const responseCabecalho = await fetch("/dados_cabecalho");
+                const cabecalho = await responseCabecalho.json();
+
+                if (cabecalho.error || !Array.isArray(cabecalho)) {
+                    document.getElementById("tabela-container").innerHTML = 
+                        `<div class="loading">Erro ao carregar estrutura: ${cabecalho.error || 'Formato inválido'}</div>`;
+                    return;
+                }
+
+                // Etapa 2: Criar a tabela e o gráfico vazios
+                criarTabelaComCabecalho(cabecalho);
+                iniciarGrafico(cabecalho);
+                
+                // Etapa 3: Buscar todos os dados em segundo plano
+                const responseDados = await fetch("/dados_json");
+                const data = await responseDados.json();
 
                 if (data.error || !Array.isArray(data)) {
-                    document.getElementById("tabela-container").innerHTML = 
-                        `<div class="loading">Erro ao carregar dados: ${data.error || 'Formato inválido'}</div>`;
+                    document.querySelector("#tabela-container table tbody").innerHTML = 
+                        `<tr><td colspan="${cabecalho.length}" class="loading">Erro ao carregar dados: ${data.error || 'Formato inválido'}</td></tr>`;
                     return;
                 }
                 if (data.length === 0) {
-                    document.getElementById("tabela-container").innerHTML = 
-                        `<div class="loading">Nenhum dado para exibir.</div>`;
+                    document.querySelector("#tabela-container table tbody").innerHTML = 
+                        `<tr><td colspan="${cabecalho.length}" class="loading">Nenhum dado para exibir.</td></tr>`;
                     return;
                 }
 
+                // Etapa 4: Iniciar a animação
                 todosOsDados = data;
-                criarTabelaComCabecalho(todosOsDados[0]);
-                iniciarGrafico(todosOsDados[0]);
+                document.querySelector("#tabela-container table tbody").innerHTML = ''; // Limpa a mensagem de "carregando"
                 intervalId = setInterval(adicionarProximoDado, 2000);
 
             } catch (error) {
@@ -142,9 +157,9 @@
             }
         }
 
-        function criarTabelaComCabecalho(primeiraLinha) {
+        // ALTERAÇÃO: Agora aceita um array de nomes de colunas
+        function criarTabelaComCabecalho(colunas) {
             const container = document.getElementById('tabela-container');
-            const colunas = Object.keys(primeiraLinha);
             const tabelaHTML = `
                 <table>
                     <thead>
@@ -152,20 +167,24 @@
                             ${colunas.map(col => `<th>${col}</th>`).join('')}
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody>
+                         <tr>
+                            <td colspan="${colunas.length}" class="loading">A carregar dados...</td>
+                        </tr>
+                    </tbody>
                 </table>
             `;
             container.innerHTML = tabelaHTML;
         }
 
-        function iniciarGrafico(primeiraLinha) {
+        // ALTERAÇÃO: Agora aceita um array de nomes de colunas
+        function iniciarGrafico(colunas) {
             const ctx = document.getElementById('meuGrafico').getContext('2d');
-            const colunasDeDados = Object.keys(primeiraLinha).slice(1); 
+            const colunasDeDados = colunas.slice(1); 
             
             const datasets = colunasDeDados.map((coluna, index) => {
                 const estilo = ESTILOS_GRAFICO[index % ESTILOS_GRAFICO.length];
                 return {
-                    // ALTERAÇÃO: Usa a lista de legendas fixas
                     label: LABELS_PROFUNDIDADE[index] || coluna, 
                     data: [],
                     borderColor: estilo.color,
@@ -180,34 +199,15 @@
 
             meuGrafico = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: [],
-                    datasets: datasets
-                },
+                data: { labels: [], datasets: datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        tooltip: { enabled: true },
-                        legend: { position: 'bottom' }
-                    },
+                    interaction: { mode: 'index', intersect: false, },
+                    plugins: { tooltip: { enabled: true }, legend: { position: 'bottom' } },
                     scales: {
-                        x: {
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Umidade Volumetrica (%)'
-                            }
-                        }
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } },
+                        y: { title: { display: true, text: 'Umidade Volumetrica (%)' } }
                     }
                 },
                 plugins: [verticalLinePlugin]
@@ -257,10 +257,12 @@
             meuGrafico.update(); 
         }
 
-        iniciarAnimacao();
+        // Inicia o novo processo de carregamento
+        iniciarPagina();
     </script>
 </body>
 </html>
+
 
 
 
