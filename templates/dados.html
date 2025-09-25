@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dados dos Sensores</title>
+    <!-- Adicionada a biblioteca do Chart.js para criar gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,9 +20,19 @@
             text-align: center;
             font-size: 22px;
         }
-        table {
+        .container {
             width: 90%;
             margin: 20px auto;
+        }
+        .grafico-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
             border-collapse: collapse;
             background: white;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -45,15 +57,24 @@
 <body>
     <header>📊 Últimos Dados dos Sensores</header>
 
-    <div id="tabela-container">
-        <div class="loading">A iniciar a visualização em tempo real...</div>
+    <div class="container">
+        <!-- Elemento Canvas para o gráfico -->
+        <div class="grafico-container">
+            <canvas id="meuGrafico"></canvas>
+        </div>
+
+        <!-- Tabela de dados -->
+        <div id="tabela-container">
+            <div class="loading">A iniciar a visualização em tempo real...</div>
+        </div>
     </div>
 
     <script>
-        let todosOsDados = []; // Guarda todos os dados recebidos do servidor
-        let indiceAtual = 0;    // Controla qual o próximo dado a ser exibido
-        let dadosNaTela = [];   // Guarda apenas os dados visíveis na tabela (máximo 10)
-        let intervalId = null;  // Identificador do nosso loop de tempo
+        let todosOsDados = []; 
+        let indiceAtual = 0;    
+        let dadosNaTela = [];   
+        let intervalId = null;  
+        let meuGrafico = null; // Variável para guardar a instância do gráfico
 
         // Função principal que busca os dados e inicia a animação
         async function iniciarAnimacao() {
@@ -75,8 +96,9 @@
 
                 todosOsDados = data;
 
-                // Cria a estrutura da tabela (cabeçalho) apenas uma vez
+                // Cria a estrutura da tabela e inicia o gráfico
                 criarTabelaComCabecalho(todosOsDados[0]);
+                iniciarGrafico(todosOsDados[0]);
 
                 // Inicia o loop que adiciona um novo dado a cada 2 segundos
                 intervalId = setInterval(adicionarProximoDado, 2000);
@@ -99,31 +121,53 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- As linhas serão inseridas dinamicamente aqui -->
                     </tbody>
                 </table>
             `;
             container.innerHTML = tabelaHTML;
         }
 
-        // Função chamada a cada 2 segundos para atualizar a tabela
+        // Inicia a instância do gráfico com configuração inicial
+        function iniciarGrafico(primeiraLinha) {
+            const ctx = document.getElementById('meuGrafico').getContext('2d');
+            
+            // Assume que a segunda coluna é o dado a ser plotado.
+            const dataKey = Object.keys(primeiraLinha)[1]; 
+
+            meuGrafico = new Chart(ctx, {
+                type: 'line', // Tipo de gráfico
+                data: {
+                    labels: [], // Rótulos do eixo X (ex: tempo)
+                    datasets: [{
+                        label: `Valores de ${dataKey}`, // Legenda do gráfico
+                        data: [], // Pontos de dados do eixo Y
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                }
+            });
+        }
+
+        // Função chamada a cada 2 segundos para atualizar a tabela e o gráfico
         function adicionarProximoDado() {
-            // Se já exibimos todos os dados, para o loop
             if (indiceAtual >= todosOsDados.length) {
                 clearInterval(intervalId);
                 return;
             }
 
             const novoDado = todosOsDados[indiceAtual];
-            dadosNaTela.push(novoDado); // Adiciona o novo dado no fim da lista
+            
+            // ALTERAÇÃO: Adiciona o novo dado no INÍCIO da lista
+            dadosNaTela.unshift(novoDado); 
 
-            // Se a lista tiver mais de 10 itens, remove o primeiro (o mais antigo)
+            // ALTERAÇÃO: Se a lista tiver mais de 10 itens, remove o ÚLTIMO (o mais antigo)
             if (dadosNaTela.length > 10) {
-                dadosNaTela.shift();
+                dadosNaTela.pop();
             }
 
             renderizarTabela(); // Redesenha a tabela com os dados atualizados
-            indiceAtual++;      // Prepara para o próximo dado
+            atualizarGrafico(); // Atualiza o gráfico com os novos dados
+            indiceAtual++;      
         }
 
         // Limpa a tabela e a recria com os dados da lista 'dadosNaTela'
@@ -133,13 +177,34 @@
 
             tbody.innerHTML = ''; // Limpa as linhas existentes
 
-            // Cria e adiciona uma nova linha para cada item na lista
+            // Cria e adiciona as linhas na nova ordem (mais recente no topo)
             dadosNaTela.forEach(linha => {
                 const tr = document.createElement('tr');
                 const valores = Object.values(linha);
                 tr.innerHTML = valores.map(val => `<td>${val === null ? '' : val}</td>`).join('');
                 tbody.appendChild(tr);
             });
+        }
+
+        // Atualiza os dados do gráfico
+        function atualizarGrafico() {
+            if (!meuGrafico) return;
+
+            // Para o gráfico, os dados precisam estar em ordem cronológica (do mais antigo para o mais novo)
+            const dadosParaGrafico = [...dadosNaTela].reverse();
+
+            // NOTA: Se quiser usar colunas diferentes, altere os índices [0] e [1] aqui
+            const labelKey = Object.keys(dadosParaGrafico[0])[0]; // Eixo X (ex: Data/Hora)
+            const dataKey = Object.keys(dadosParaGrafico[0])[1];  // Eixo Y (ex: Temperatura)
+
+            // Extrai os rótulos e os pontos de dados
+            const labels = dadosParaGrafico.map(d => d[labelKey]);
+            const dataPoints = dadosParaGrafico.map(d => d[dataKey]);
+
+            // Atualiza o gráfico com os novos dados
+            meuGrafico.data.labels = labels;
+            meuGrafico.data.datasets[0].data = dataPoints;
+            meuGrafico.update(); // Redesenha o gráfico
         }
 
         // Inicia todo o processo quando a página carrega
