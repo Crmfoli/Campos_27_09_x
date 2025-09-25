@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -74,31 +74,48 @@
         let indiceAtual = 0;    
         let dadosNaTela = [];   
         let intervalId = null;  
-        let meuGrafico = null; // Variável para guardar a instância do gráfico
+        let meuGrafico = null; 
 
-        // ALTERAÇÃO: Cores e estilos de ponto para corresponder à imagem
         const ESTILOS_GRAFICO = [
-            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' },     // Roxo
-            { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },       // Azul
-            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' },         // Verde
-            { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },   // Laranja
-            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' },      // Vermelho
-            { color: 'rgb(255, 0, 255)', pointStyle: 'star' }        // Magenta
+            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' },
+            { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },
+            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' },
+            { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },
+            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' },
+            { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
 
-        // Função para deixar os nomes das colunas mais legíveis
+        // NOVO: Plugin para desenhar a linha vertical no gráfico
+        const verticalLinePlugin = {
+          id: 'verticalLine',
+          afterDraw: (chart) => {
+            if (chart.tooltip?._active?.length) {
+              const ctx = chart.ctx;
+              const x = chart.tooltip._active[0].element.x;
+              const topY = chart.scales.y.top;
+              const bottomY = chart.scales.y.bottom;
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(x, topY);
+              ctx.lineTo(x, bottomY);
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+        };
+
         function formatarNomeColuna(nome) {
             if (nome && nome.toLowerCase().startsWith('prof')) {
                 const partes = nome.split('_');
-                // Pega os números (ex: '0', '3') e junta com '.'
                 const valor = partes.slice(1, -1).join('.');
                 return `Profundidade ${valor} m`;
             }
             return nome;
         }
 
-
-        // Função principal que busca os dados e inicia a animação
         async function iniciarAnimacao() {
             try {
                 const response = await fetch("/dados_json");
@@ -109,7 +126,6 @@
                         `<div class="loading">Erro ao carregar dados: ${data.error || 'Formato inválido'}</div>`;
                     return;
                 }
-
                 if (data.length === 0) {
                     document.getElementById("tabela-container").innerHTML = 
                         `<div class="loading">Nenhum dado para exibir.</div>`;
@@ -137,8 +153,7 @@
                             ${colunas.map(col => `<th>${col}</th>`).join('')}
                         </tr>
                     </thead>
-                    <tbody>
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             `;
             container.innerHTML = tabelaHTML;
@@ -154,7 +169,7 @@
                     label: formatarNomeColuna(coluna), 
                     data: [],
                     borderColor: estilo.color,
-                    backgroundColor: estilo.color, // Cor do ponto
+                    backgroundColor: estilo.color,
                     pointStyle: estilo.pointStyle,
                     pointRadius: 5,
                     pointHoverRadius: 7,
@@ -177,16 +192,17 @@
                         intersect: false,
                     },
                     plugins: {
-                        tooltip: {
-                            enabled: true
-                        },
-                        // ALTERAÇÃO: Posição da legenda
-                        legend: {
-                            position: 'bottom',
-                        }
+                        tooltip: { enabled: true },
+                        legend: { position: 'bottom' }
                     },
-                    // ALTERAÇÃO: Títulos dos eixos
                     scales: {
+                        // ALTERAÇÃO: Rotação dos rótulos do eixo X
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
                         y: {
                             title: {
                                 display: true,
@@ -194,7 +210,9 @@
                             }
                         }
                     }
-                }
+                },
+                // ALTERAÇÃO: Registo do novo plugin
+                plugins: [verticalLinePlugin]
             });
         }
 
@@ -245,5 +263,6 @@
     </script>
 </body>
 </html>
+
 
 
