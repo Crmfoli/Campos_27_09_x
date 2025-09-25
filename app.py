@@ -58,18 +58,23 @@ def dados_json():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ALTERAÇÃO: Nova rota que retorna apenas o cabeçalho do arquivo
-@app.route("/dados_cabecalho")
-def dados_cabecalho():
+# ALTERAÇÃO: Nova rota que retorna apenas os 20 primeiros dados para um carregamento inicial rápido
+@app.route("/dados_iniciais")
+def dados_iniciais():
     try:
-        # Lê apenas a primeira linha para obter os nomes das colunas de forma eficiente
-        df = pd.read_excel(EXCEL_FILE, nrows=0) 
-        return jsonify(df.columns.tolist())
+        # Lê apenas as 20 primeiras linhas, o que é muito mais rápido
+        df = pd.read_excel(EXCEL_FILE, nrows=20) 
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sem_nan = df.replace({np.nan: None})
+        return jsonify(df_sem_nan.to_dict(orient="records"))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
 
