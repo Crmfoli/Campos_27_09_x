@@ -76,6 +76,16 @@
         let intervalId = null;  
         let meuGrafico = null; // Variável para guardar a instância do gráfico
 
+        // Lista de cores para usar nas diferentes linhas do gráfico
+        const CORES_GRAFICO = [
+            'rgb(255, 99, 132)',   // Vermelho
+            'rgb(54, 162, 235)',   // Azul
+            'rgb(255, 205, 86)',   // Amarelo
+            'rgb(75, 192, 192)',   // Verde-água
+            'rgb(153, 102, 255)',  // Roxo
+            'rgb(255, 159, 64)'    // Laranja
+        ];
+
         // Função principal que busca os dados e inicia a animação
         async function iniciarAnimacao() {
             try {
@@ -127,23 +137,27 @@
             container.innerHTML = tabelaHTML;
         }
 
-        // Inicia a instância do gráfico com configuração inicial
+        // Inicia a instância do gráfico com múltiplos datasets (um para cada profundidade)
         function iniciarGrafico(primeiraLinha) {
             const ctx = document.getElementById('meuGrafico').getContext('2d');
             
-            // Assume que a segunda coluna é o dado a ser plotado.
-            const dataKey = Object.keys(primeiraLinha)[1]; 
+            // As colunas de dados são todas, exceto a primeira (que é o rótulo do eixo X)
+            const colunasDeDados = Object.keys(primeiraLinha).slice(1); 
+            
+            // Cria um dataset para cada coluna de dados (cada profundidade)
+            const datasets = colunasDeDados.map((coluna, index) => ({
+                label: `Valores de ${coluna}`, // Legenda do gráfico para cada profundidade
+                data: [], // Pontos de dados do eixo Y
+                borderColor: CORES_GRAFICO[index % CORES_GRAFICO.length], // Pega uma cor da lista
+                tension: 0.1,
+                fill: false
+            }));
 
             meuGrafico = new Chart(ctx, {
                 type: 'line', // Tipo de gráfico
                 data: {
                     labels: [], // Rótulos do eixo X (ex: tempo)
-                    datasets: [{
-                        label: `Valores de ${dataKey}`, // Legenda do gráfico
-                        data: [], // Pontos de dados do eixo Y
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1
-                    }]
+                    datasets: datasets
                 }
             });
         }
@@ -157,16 +171,14 @@
 
             const novoDado = todosOsDados[indiceAtual];
             
-            // ALTERAÇÃO: Adiciona o novo dado no INÍCIO da lista
             dadosNaTela.unshift(novoDado); 
 
-            // ALTERAÇÃO: Se a lista tiver mais de 10 itens, remove o ÚLTIMO (o mais antigo)
             if (dadosNaTela.length > 10) {
                 dadosNaTela.pop();
             }
 
-            renderizarTabela(); // Redesenha a tabela com os dados atualizados
-            atualizarGrafico(); // Atualiza o gráfico com os novos dados
+            renderizarTabela(); 
+            atualizarGrafico(); 
             indiceAtual++;      
         }
 
@@ -177,7 +189,6 @@
 
             tbody.innerHTML = ''; // Limpa as linhas existentes
 
-            // Cria e adiciona as linhas na nova ordem (mais recente no topo)
             dadosNaTela.forEach(linha => {
                 const tr = document.createElement('tr');
                 const valores = Object.values(linha);
@@ -186,25 +197,32 @@
             });
         }
 
-        // Atualiza os dados do gráfico
+        // Atualiza os dados do gráfico para todas as profundidades
         function atualizarGrafico() {
-            if (!meuGrafico) return;
+            if (!meuGrafico || dadosNaTela.length === 0) return;
 
             // Para o gráfico, os dados precisam estar em ordem cronológica (do mais antigo para o mais novo)
             const dadosParaGrafico = [...dadosNaTela].reverse();
 
-            // NOTA: Se quiser usar colunas diferentes, altere os índices [0] e [1] aqui
-            const labelKey = Object.keys(dadosParaGrafico[0])[0]; // Eixo X (ex: Data/Hora)
-            const dataKey = Object.keys(dadosParaGrafico[0])[1];  // Eixo Y (ex: Temperatura)
-
-            // Extrai os rótulos e os pontos de dados
+            // A primeira coluna é o rótulo do eixo X (ex: Data/Hora)
+            const labelKey = Object.keys(dadosParaGrafico[0])[0];
             const labels = dadosParaGrafico.map(d => d[labelKey]);
-            const dataPoints = dadosParaGrafico.map(d => d[dataKey]);
+            
+            // As outras colunas são os datasets de dados
+            const colunasDeDados = Object.keys(dadosParaGrafico[0]).slice(1);
 
-            // Atualiza o gráfico com os novos dados
+            // Atualiza os rótulos do eixo X do gráfico
             meuGrafico.data.labels = labels;
-            meuGrafico.data.datasets[0].data = dataPoints;
-            meuGrafico.update(); // Redesenha o gráfico
+
+            // Atualiza os dados de cada dataset (cada linha/profundidade)
+            colunasDeDados.forEach((coluna, index) => {
+                const dataPoints = dadosParaGrafico.map(d => d[coluna]);
+                if (meuGrafico.data.datasets[index]) {
+                    meuGrafico.data.datasets[index].data = dataPoints;
+                }
+            });
+
+            meuGrafico.update(); // Redesenha o gráfico com os novos dados
         }
 
         // Inicia todo o processo quando a página carrega
@@ -212,6 +230,3 @@
     </script>
 </body>
 </html>
-
-
-
