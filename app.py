@@ -40,13 +40,15 @@ def dados():
     return render_template("dados.html")
 
 
-# Rota que entrega os últimos 10 dados do Excel em JSON
+# Rota que entrega os dados do Excel em JSON, tratando valores inválidos
 @app.route("/dados_json")
 def dados_json():
     try:
         df = pd.read_excel(EXCEL_FILE)
-        # Removemos o '.tail(10)' para pegar todos os dados, do mais antigo ao mais novo
-        return jsonify(df.to_dict(orient="records"))
+        # Converte valores 'NaN' (Not a Number) do pandas para 'None' em Python.
+        # Isso é necessário porque 'NaN' não é um valor JSON válido, mas 'None' é convertido para 'null'.
+        df_sem_nan = df.where(pd.notnull(df), None)
+        return jsonify(df_sem_nan.to_dict(orient="records"))
     except Exception as e:
         return jsonify({"error": str(e)})
 
