@@ -20,9 +20,14 @@
             text-align: center;
             font-size: 24px;
         }
-        #map {
+        .map-container {
             width: 100%;
             flex-grow: 1;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
         }
     </style>
 </head>
@@ -31,39 +36,19 @@
         Análise de Riscos Geológicos
     </header>
 
-    <div id="map"></div>
+    <div class="map-container">
+        <iframe 
+            src="https://www.google.com/maps?q=-22.741620,-45.598395&hl=pt-BR&z=15&output=embed"
+            style="border:0;" 
+            allowfullscreen="" 
+            loading="lazy" 
+            referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+    </div>
 
-    <script>
-        function initMap() {
-            // Coordenadas fornecidas
-            const localizacao = { lat: -22.741620, lng: -45.598395 };
-
-            // Cria o mapa
-            const map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 15,
-                center: localizacao,
-            });
-
-            // Cria o marcador com clique que leva para outra página
-            const marker = new google.maps.Marker({
-                position: localizacao,
-                map: map,
-                title: "Clique para ver os dados",
-            });
-
-            // Evento de clique no marcador
-            marker.addListener("click", () => {
-                window.location.href = "dados.html"; // aqui você coloca o link para o Excel ou página
-            });
-        }
-    </script>
-
-    <!-- Substitua "YOUR_API_KEY" por sua chave da API do Google Maps -->
-    <script async 
-            src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
-    </script>
 </body>
 </html>
+
 
 
 
