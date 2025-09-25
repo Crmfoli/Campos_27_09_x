@@ -63,10 +63,13 @@ def dados_json():
         for col in df.select_dtypes(include=['datetime64[ns]']).columns:
             df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').where(df[col].notna(), None)
 
-        # Para todas as outras colunas, converte 'NaN' para 'None'.
-        df_sem_nan = df.where(pd.notnull(df), None)
+        # CORREÇÃO DEFINITIVA:
+        # 1. Converte todo o DataFrame para o tipo 'object'.
+        # 2. Substitui todos os valores nulos (NaN, NaT, etc.) por None do Python.
+        # Isto garante que não haja tipos de dados incompatíveis com JSON.
+        df_final = df.astype(object).where(pd.notnull(df), None)
         
-        return jsonify(df_sem_nan.to_dict(orient="records"))
+        return jsonify(df_final.to_dict(orient="records"))
     except FileNotFoundError:
         print(f"Erro: O ficheiro de dados '{DATA_FILE}' não foi encontrado.")
         return jsonify({"error": "Ficheiro de dados não encontrado no servidor."})
@@ -77,5 +80,7 @@ def dados_json():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
 
 
