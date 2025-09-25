@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -137,27 +137,42 @@
             container.innerHTML = tabelaHTML;
         }
 
-        // Inicia a instância do gráfico com múltiplos datasets (um para cada profundidade)
+        // Inicia a instância do gráfico com múltiplos datasets e tooltip interativo
         function iniciarGrafico(primeiraLinha) {
             const ctx = document.getElementById('meuGrafico').getContext('2d');
             
-            // As colunas de dados são todas, exceto a primeira (que é o rótulo do eixo X)
             const colunasDeDados = Object.keys(primeiraLinha).slice(1); 
             
-            // Cria um dataset para cada coluna de dados (cada profundidade)
             const datasets = colunasDeDados.map((coluna, index) => ({
-                label: `Valores de ${coluna}`, // Legenda do gráfico para cada profundidade
-                data: [], // Pontos de dados do eixo Y
-                borderColor: CORES_GRAFICO[index % CORES_GRAFICO.length], // Pega uma cor da lista
+                label: `Valores de ${coluna}`, 
+                data: [],
+                borderColor: CORES_GRAFICO[index % CORES_GRAFICO.length],
                 tension: 0.1,
                 fill: false
             }));
 
             meuGrafico = new Chart(ctx, {
-                type: 'line', // Tipo de gráfico
+                type: 'line',
                 data: {
-                    labels: [], // Rótulos do eixo X (ex: tempo)
+                    labels: [],
                     datasets: datasets
+                },
+                // AQUI COMEÇA A NOVA CONFIGURAÇÃO
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: {
+                        // Faz com que o tooltip mostre os dados de todas as linhas
+                        // ao passar o rato sobre um ponto no eixo do tempo.
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        tooltip: {
+                            // Ativa o tooltip (já é padrão)
+                            enabled: true
+                        }
+                    }
                 }
             });
         }
@@ -201,20 +216,15 @@
         function atualizarGrafico() {
             if (!meuGrafico || dadosNaTela.length === 0) return;
 
-            // Para o gráfico, os dados precisam estar em ordem cronológica (do mais antigo para o mais novo)
             const dadosParaGrafico = [...dadosNaTela].reverse();
 
-            // A primeira coluna é o rótulo do eixo X (ex: Data/Hora)
             const labelKey = Object.keys(dadosParaGrafico[0])[0];
             const labels = dadosParaGrafico.map(d => d[labelKey]);
             
-            // As outras colunas são os datasets de dados
             const colunasDeDados = Object.keys(dadosParaGrafico[0]).slice(1);
 
-            // Atualiza os rótulos do eixo X do gráfico
             meuGrafico.data.labels = labels;
 
-            // Atualiza os dados de cada dataset (cada linha/profundidade)
             colunasDeDados.forEach((coluna, index) => {
                 const dataPoints = dadosParaGrafico.map(d => d[coluna]);
                 if (meuGrafico.data.datasets[index]) {
@@ -222,7 +232,7 @@
                 }
             });
 
-            meuGrafico.update(); // Redesenha o gráfico com os novos dados
+            meuGrafico.update(); 
         }
 
         // Inicia todo o processo quando a página carrega
@@ -230,3 +240,4 @@
     </script>
 </body>
 </html>
+
