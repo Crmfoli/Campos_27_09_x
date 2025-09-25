@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -76,15 +76,27 @@
         let intervalId = null;  
         let meuGrafico = null; // Variável para guardar a instância do gráfico
 
-        // Lista de cores para usar nas diferentes linhas do gráfico
-        const CORES_GRAFICO = [
-            'rgb(255, 99, 132)',   // Vermelho
-            'rgb(54, 162, 235)',   // Azul
-            'rgb(255, 205, 86)',   // Amarelo
-            'rgb(75, 192, 192)',   // Verde-água
-            'rgb(153, 102, 255)',  // Roxo
-            'rgb(255, 159, 64)'    // Laranja
+        // ALTERAÇÃO: Cores e estilos de ponto para corresponder à imagem
+        const ESTILOS_GRAFICO = [
+            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' },     // Roxo
+            { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },       // Azul
+            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' },         // Verde
+            { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },   // Laranja
+            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' },      // Vermelho
+            { color: 'rgb(255, 0, 255)', pointStyle: 'star' }        // Magenta
         ];
+
+        // Função para deixar os nomes das colunas mais legíveis
+        function formatarNomeColuna(nome) {
+            if (nome && nome.toLowerCase().startsWith('prof')) {
+                const partes = nome.split('_');
+                // Pega os números (ex: '0', '3') e junta com '.'
+                const valor = partes.slice(1, -1).join('.');
+                return `Profundidade ${valor} m`;
+            }
+            return nome;
+        }
+
 
         // Função principal que busca os dados e inicia a animação
         async function iniciarAnimacao() {
@@ -105,12 +117,8 @@
                 }
 
                 todosOsDados = data;
-
-                // Cria a estrutura da tabela e inicia o gráfico
                 criarTabelaComCabecalho(todosOsDados[0]);
                 iniciarGrafico(todosOsDados[0]);
-
-                // Inicia o loop que adiciona um novo dado a cada 2 segundos
                 intervalId = setInterval(adicionarProximoDado, 2000);
 
             } catch (error) {
@@ -119,7 +127,6 @@
             }
         }
 
-        // Cria a tabela vazia com o cabeçalho correto
         function criarTabelaComCabecalho(primeiraLinha) {
             const container = document.getElementById('tabela-container');
             const colunas = Object.keys(primeiraLinha);
@@ -137,19 +144,24 @@
             container.innerHTML = tabelaHTML;
         }
 
-        // Inicia a instância do gráfico com múltiplos datasets e tooltip interativo
         function iniciarGrafico(primeiraLinha) {
             const ctx = document.getElementById('meuGrafico').getContext('2d');
-            
             const colunasDeDados = Object.keys(primeiraLinha).slice(1); 
             
-            const datasets = colunasDeDados.map((coluna, index) => ({
-                label: `Valores de ${coluna}`, 
-                data: [],
-                borderColor: CORES_GRAFICO[index % CORES_GRAFICO.length],
-                tension: 0.1,
-                fill: false
-            }));
+            const datasets = colunasDeDados.map((coluna, index) => {
+                const estilo = ESTILOS_GRAFICO[index % ESTILOS_GRAFICO.length];
+                return {
+                    label: formatarNomeColuna(coluna), 
+                    data: [],
+                    borderColor: estilo.color,
+                    backgroundColor: estilo.color, // Cor do ponto
+                    pointStyle: estilo.pointStyle,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    tension: 0.1,
+                    fill: false
+                };
+            });
 
             meuGrafico = new Chart(ctx, {
                 type: 'line',
@@ -157,53 +169,54 @@
                     labels: [],
                     datasets: datasets
                 },
-                // AQUI COMEÇA A NOVA CONFIGURAÇÃO
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
                     interaction: {
-                        // Faz com que o tooltip mostre os dados de todas as linhas
-                        // ao passar o rato sobre um ponto no eixo do tempo.
                         mode: 'index',
                         intersect: false,
                     },
                     plugins: {
                         tooltip: {
-                            // Ativa o tooltip (já é padrão)
                             enabled: true
+                        },
+                        // ALTERAÇÃO: Posição da legenda
+                        legend: {
+                            position: 'bottom',
+                        }
+                    },
+                    // ALTERAÇÃO: Títulos dos eixos
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Umidade Volumetrica (%)'
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Função chamada a cada 2 segundos para atualizar a tabela e o gráfico
         function adicionarProximoDado() {
             if (indiceAtual >= todosOsDados.length) {
                 clearInterval(intervalId);
                 return;
             }
-
             const novoDado = todosOsDados[indiceAtual];
-            
             dadosNaTela.unshift(novoDado); 
-
             if (dadosNaTela.length > 10) {
                 dadosNaTela.pop();
             }
-
             renderizarTabela(); 
             atualizarGrafico(); 
             indiceAtual++;      
         }
 
-        // Limpa a tabela e a recria com os dados da lista 'dadosNaTela'
         function renderizarTabela() {
             const tbody = document.querySelector("#tabela-container table tbody");
             if (!tbody) return;
-
-            tbody.innerHTML = ''; // Limpa as linhas existentes
-
+            tbody.innerHTML = ''; 
             dadosNaTela.forEach(linha => {
                 const tr = document.createElement('tr');
                 const valores = Object.values(linha);
@@ -212,32 +225,25 @@
             });
         }
 
-        // Atualiza os dados do gráfico para todas as profundidades
         function atualizarGrafico() {
             if (!meuGrafico || dadosNaTela.length === 0) return;
-
             const dadosParaGrafico = [...dadosNaTela].reverse();
-
             const labelKey = Object.keys(dadosParaGrafico[0])[0];
             const labels = dadosParaGrafico.map(d => d[labelKey]);
-            
             const colunasDeDados = Object.keys(dadosParaGrafico[0]).slice(1);
-
             meuGrafico.data.labels = labels;
-
             colunasDeDados.forEach((coluna, index) => {
                 const dataPoints = dadosParaGrafico.map(d => d[coluna]);
                 if (meuGrafico.data.datasets[index]) {
                     meuGrafico.data.datasets[index].data = dataPoints;
                 }
             });
-
             meuGrafico.update(); 
         }
 
-        // Inicia todo o processo quando a página carrega
         iniciarAnimacao();
     </script>
 </body>
 </html>
+
 
