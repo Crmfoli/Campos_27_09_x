@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pino de Monitoramento</title>
+  <title>Mapa de Monitoramento</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,9 +13,6 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background-color: #f0f0f0;
     }
     header {
       background-color: #007bff;
@@ -23,34 +21,11 @@
       padding: 15px;
       text-align: center;
       font-size: 24px;
+      flex-shrink: 0;
     }
-    .pino {
-      width: 40px;
-      height: 40px;
-      background-color: red;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      position: relative;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    .pino:hover {
-      transform: rotate(-45deg) scale(1.1);
-    }
-    .pino::after {
-      content: "";
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 10px;
-      left: 10px;
-    }
-    .label {
-      margin-top: 10px;
-      font-size: 18px;
-      font-weight: bold;
+    #map {
+      flex-grow: 1;
+      width: 100%;
     }
   </style>
 </head>
@@ -59,13 +34,36 @@
     Análise de Riscos Geológicos
   </header>
 
-  <div onclick="window.location.href='dados.html'">
-    <div class="pino"></div>
-    <div class="label">Clique no Pino</div>
-  </div>
+  <div id="map"></div>
 
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // Coordenadas fornecidas
+    const localizacao = [-22.741620, -45.598395];
+
+    // Cria o mapa
+    const map = L.map('map').setView(localizacao, 15);
+
+    // Camada do mapa (openstreetmap grátis)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Cria o marcador
+    const marker = L.marker(localizacao).addTo(map);
+
+    // Evento de clique no marcador
+    marker.on('click', () => {
+      window.location.href = "dados.html"; // redireciona ao clicar no pino
+    });
+
+    // Tooltip (opcional)
+    marker.bindPopup("<b>Clique aqui para ver os dados</b>").openPopup();
+  </script>
 </body>
 </html>
+
 
 
 
