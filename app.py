@@ -58,8 +58,19 @@ def dados_json():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ALTERAÇÃO: Nova rota que retorna apenas o cabeçalho do arquivo
+@app.route("/dados_cabecalho")
+def dados_cabecalho():
+    try:
+        # Lê apenas a primeira linha para obter os nomes das colunas de forma eficiente
+        df = pd.read_excel(EXCEL_FILE, nrows=0) 
+        return jsonify(df.columns.tolist())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
 
