@@ -1,38 +1,40 @@
-from flask import Flask, render_template, request, jsonify
+# Adicionamos 'redirect' e 'url_for' para redirecionar o usuário
+from flask import Flask, render_template, request, redirect, url_for
 
-# Inicializa a aplicação Flask
 app = Flask(__name__)
 
-# Rota principal ('/') que exibe a página de login
+# Rota principal ('/') que exibe a página de login (sem alterações)
 @app.route('/')
 def home():
-    """Renderiza o nosso arquivo HTML como a página inicial."""
     return render_template('index.html')
 
-# Rota '/login' que recebe os dados do formulário via POST
+# Rota '/login' que recebe os dados e AGORA REDIRECIONA
 @app.route('/login', methods=['POST'])
 def login():
-    """Recebe os dados do formulário enviado pelo navegador."""
     email = request.form.get('email')
     api_token = request.form.get('api_token')
     senha = request.form.get('senha')
 
-    # Imprime os dados no console do servidor (no Render, isso aparecerá nos logs)
     print("--- Tentativa de Acesso Recebida ---")
     print(f"E-mail: {email}")
     print(f"API Token: {api_token}")
-    print(f"Senha: {senha}") # Em uma aplicação real, NUNCA imprima senhas!
     print("-----------------------------------")
 
-    # Aqui você colocaria sua lógica de validação
-    # Por exemplo: verificar se o usuário e senha estão corretos no banco de dados
+    #
+    # NESTE PONTO, VOCÊ FARIA A VALIDAÇÃO REAL DOS DADOS
+    #
+    
+    # Se a validação for bem-sucedida, redirecionamos para a página do mapa
+    # A linha abaixo foi a principal alteração nesta função
+    return redirect(url_for('pagina_do_mapa'))
 
-    # Retorna uma resposta para o navegador em formato JSON
-    return jsonify({
-        'status': 'sucesso',
-        'message': 'Dados recebidos com sucesso no servidor!'
-    })
+# --- NOVA ROTA PARA A PÁGINA DO MAPA ---
+# Esta é a nova função que vai renderizar a página com o mapa
+@app.route('/mapa')
+def pagina_do_mapa():
+    """Renderiza a página que conterá o mapa."""
+    return render_template('mapa.html')
 
-# Inicia o servidor quando o script é executado diretamente
+
 if __name__ == '__main__':
     app.run(debug=True)
