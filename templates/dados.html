@@ -3,62 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dados do Sensor</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <title>Dados dos Sensores</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
+      background-color: #f9f9f9;
     }
     h2 {
-      color: #007bff;
+      text-align: center;
+      color: #333;
     }
     table {
-      border-collapse: collapse;
       width: 100%;
-      margin-top: 15px;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: white;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    th, td {
+    table, th, td {
       border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
     }
     th {
       background-color: #007bff;
       color: white;
+      padding: 10px;
+      text-align: center;
+    }
+    td {
+      padding: 8px;
+      text-align: center;
+    }
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
     }
   </style>
 </head>
 <body>
-  <h2>Dados do Sensor</h2>
-  <table id="tabela-dados"></table>
-
-  <script>
-    async function carregarExcel() {
-      // Substitua pelo link RAW do GitHub
-      const url = "https://raw.githubusercontent.com/usuario/repositorio/main/dados_sensores.xlsx";  
-
-      const response = await fetch(url);
-      const data = await response.arrayBuffer();
-
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-      const tabela = document.getElementById("tabela-dados");
-      tabela.innerHTML = "";
-
-      json.forEach((linha, i) => {
-        const row = tabela.insertRow();
-        linha.forEach(coluna => {
-          const cell = i === 0 ? document.createElement("th") : document.createElement("td");
-          cell.textContent = coluna;
-          row.appendChild(cell);
-        });
-      });
-    }
-
-    carregarExcel();
-  </script>
+  <h2>Últimos 20 Registros do Sensor</h2>
+  <table>
+    <thead>
+      <tr>
+        {% for col in colunas %}
+          <th>{{ col }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in dados %}
+        <tr>
+          {% for col in colunas %}
+            <td>{{ linha[col] }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </body>
 </html>
+
