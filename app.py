@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 import pandas as pd
 import os
+import numpy as np
 
 app = Flask(__name__)
 
-# Alterado de volta para ler o ficheiro .xlsx
-DATA_FILE = os.path.join(os.path.dirname(__file__), "dados_sensores.xlsx")
+# Caminho do Excel
+EXCEL_FILE = os.path.join(os.path.dirname(__file__), "dados_sensores.xlsx")
 
 
 # Rota inicial -> login
@@ -40,33 +41,35 @@ def dados():
     return render_template("dados.html")
 
 
-# Rota que entrega os dados do Excel em JSON, tratando valores inválidos
+# Rota que entrega todos os dados do Excel em JSON
 @app.route("/dados_json")
 def dados_json():
     try:
-        # Usamos read_excel para ler o ficheiro .xlsx
-        df = pd.read_excel(DATA_FILE)
-
-        # A lógica para limpar os dados permanece a mesma, para garantir a compatibilidade com JSON
+        df = pd.read_excel(EXCEL_FILE)
+        # Converte colunas de data/hora para string
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
         
-        # Converte colunas de data/hora para string.
-        for col in df.select_dtypes(include=['datetime64[ns]']).columns:
-            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').where(df[col].notna(), None)
-
-        # CORREÇÃO DEFINITIVA:
-        # 1. Converte todo o DataFrame para o tipo 'object'.
-        # 2. Substitui todos os valores nulos (NaN, NaT, etc.) por None do Python.
-        # Isto garante que não haja tipos de dados incompatíveis com JSON.
-        df_final = df.astype(object).where(pd.notnull(df), None)
+        # Substitui NaN por None (que vira null em JSON)
+        df_sem_nan = df.replace({np.nan: None})
         
-        return jsonify(df_final.to_dict(orient="records"))
-    except FileNotFoundError:
-        print(f"Erro: O ficheiro de dados '{DATA_FILE}' não foi encontrado.")
-        return jsonify({"error": "Ficheiro de dados não encontrado no servidor."})
+        return jsonify(df_sem_nan.to_dict(orient="records"))
     except Exception as e:
-        print(f"Erro ao processar o ficheiro de dados: {e}") # Log do erro no terminal
-        return jsonify({"error": str(e)})
+        return jsonify({"error": str(e)}), 500
+
+# ALTERAÇÃO: Nova rota que retorna apenas o cabeçalho do arquivo
+@app.route("/dados_cabecalho")
+def dados_cabecalho():
+    try:
+        # Lê apenas a primeira linha para obter os nomes das colunas de forma eficiente
+        df = pd.read_excel(EXCEL_FILE, nrows=0) 
+        return jsonify(df.columns.tolist())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
