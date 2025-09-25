@@ -45,11 +45,19 @@ def dados():
 def dados_json():
     try:
         df = pd.read_excel(EXCEL_FILE)
-        # Converte valores 'NaN' (Not a Number) do pandas para 'None' em Python.
-        # Isso é necessário porque 'NaN' não é um valor JSON válido, mas 'None' é convertido para 'null'.
+
+        # Converte colunas de data/hora para string, pois o JSON não suporta objetos de data.
+        # Onde o valor for NaT (Not a Time), ele será convertido para None.
+        for col in df.select_dtypes(include=['datetime64[ns]']).columns:
+            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').where(df[col].notna(), None)
+
+        # Para todas as outras colunas, converte 'NaN' (Not a Number) para 'None'.
+        # 'None' em Python é convertido para 'null' em JSON, que é um valor válido.
         df_sem_nan = df.where(pd.notnull(df), None)
+        
         return jsonify(df_sem_nan.to_dict(orient="records"))
     except Exception as e:
+        print(f"Erro ao processar o arquivo Excel: {e}") # Log do erro no terminal do servidor
         return jsonify({"error": str(e)})
 
 
