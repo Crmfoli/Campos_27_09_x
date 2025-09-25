@@ -21,13 +21,11 @@
     <header>📊 Dados de Monitoramento</header>
 
     <div class="container">
-        <!-- Gráfico para o novo arquivo (pluviometria, sucção, temperatura) -->
         <div class="grafico-container">
             <h2>Estação Meteorológica</h2>
             <canvas id="graficoPluviometria"></canvas>
         </div>
 
-        <!-- Gráfico para os sensores de umidade -->
         <div class="grafico-container">
             <h2>Umidade do Solo</h2>
             <canvas id="graficoSensores"></canvas>
@@ -52,12 +50,16 @@
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
 
-        // ALTERAÇÃO: Estilos para o novo gráfico da ESTAÇÃO METEOROLÓGICA
-        const ESTILOS_ESTACAO = [
-            { color: 'rgb(54, 162, 235)', pointStyle: 'rect' },    // Precipitação
-            { color: 'rgb(75, 192, 192)', pointStyle: 'triangle' },// Sucção
-            { color: 'rgb(255, 99, 132)', pointStyle: 'star' }     // °C Temp_Solo
-        ];
+        // ALTERAÇÃO: Estilos para o novo gráfico da ESTAÇÃO METEOROLÓGICA (ajustados para a combinação de tipos)
+        const ESTILOS_ESTACAO = {
+            'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', pointStyle: 'rect', yAxisID: 'y' },
+            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', pointStyle: 'circle', yAxisID: 'y1' },
+            'Sucção': { type: 'line', color: 'rgb(75, 192, 192)', borderColor: 'rgb(75, 192, 192)', pointStyle: 'triangle', yAxisID: 'y1' },
+            '°C Temp_Solo': { type: 'line', color: 'rgb(255, 99, 132)', borderColor: 'rgb(255, 99, 132)', pointStyle: 'star', yAxisID: 'y1' }
+            // Adicione mais colunas aqui se houver e defina seus estilos e eixos
+        };
+        const defaultEstacaoStyle = { type: 'line', color: 'rgb(100, 100, 100)', borderColor: 'rgb(100, 100, 100)', pointStyle: 'cross', yAxisID: 'y1' };
+
 
         const verticalLinePlugin = {
           id: 'verticalLine',
@@ -123,17 +125,68 @@
             });
         }
 
-        // ALTERAÇÃO: Gráfico de linha para múltiplos dados da estação
+        // ALTERAÇÃO: Configuração para gráfico de combinação (barras e linhas)
         function iniciarGraficoPluviometria(colunas) {
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
-            const datasets = colunas.slice(1).map((col, i) => ({
-                label: col, data: [], borderColor: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].color, backgroundColor: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].color,
-                pointStyle: ESTILOS_ESTACAO[i % ESTILOS_ESTACAO.length].pointStyle, pointRadius: 5, pointHoverRadius: 7, tension: 0.1, fill: false
-            }));
+            
+            const datasets = colunas.slice(1).map(col => {
+                const estilo = ESTILOS_ESTACAO[col] || defaultEstacaoStyle; // Pega estilo específico ou padrão
+                return {
+                    label: col,
+                    data: [],
+                    type: estilo.type, // Define o tipo aqui (bar ou line)
+                    borderColor: estilo.borderColor,
+                    backgroundColor: estilo.color,
+                    pointStyle: estilo.pointStyle,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    tension: (estilo.type === 'line' ? 0.1 : 0), // Linhas com tensão, barras sem
+                    fill: false,
+                    yAxisID: estilo.yAxisID // Associa ao eixo Y correto
+                };
+            });
+
             graficoPluviometria = new Chart(ctx, {
-                type: 'line', // Alterado para 'line'
+                type: 'bar', // Tipo padrão, mas os datasets individualmente podem ter outro
                 data: { labels: [], datasets: datasets },
-                options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Valores' }, beginAtZero: false } } },
+                options: { 
+                    responsive: true, 
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { 
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: { // Adiciona unidade ao tooltip
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2);
+                                        if (context.dataset.label === 'Precipitação' || context.dataset.label === 'Precipitação Acumulada') {
+                                            label += ' mm';
+                                        } else if (context.dataset.label === '°C Temp_Solo') {
+                                            label += ' °C';
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
+                        y: { // Eixo Y para Precipitação (barras)
+                            position: 'left',
+                            title: { display: true, text: 'Precipitação (mm)' }, 
+                            beginAtZero: true
+                        },
+                        y1: { // Eixo Y1 para outros dados (linhas)
+                            position: 'right',
+                            title: { display: true, text: 'Outros Valores' },
+                            beginAtZero: false,
+                            grid: { drawOnChartArea: false } // Não desenha grade para evitar poluição visual
+                        }
+                    } 
+                },
                 plugins: [verticalLinePlugin]
             });
         }
@@ -180,7 +233,7 @@
             graficoSensores.update(); 
         }
 
-        // ALTERAÇÃO: Atualiza todas as linhas do gráfico da estação
+        // ALTERAÇÃO: Atualiza todas as linhas/barras do gráfico da estação
         function atualizarGraficoPluviometria() {
             if (!graficoPluviometria || dadosNaTelaPluviometria.length === 0) return;
             const dadosParaGrafico = [...dadosNaTelaPluviometria].reverse();
@@ -197,3 +250,4 @@
     </script>
 </body>
 </html>
+
