@@ -46,53 +46,107 @@
     <header>📊 Últimos Dados dos Sensores</header>
 
     <div id="tabela-container">
-        <div class="loading">Carregando dados...</div>
+        <div class="loading">A iniciar a visualização em tempo real...</div>
     </div>
 
     <script>
-        async function carregarDados() {
+        let todosOsDados = []; // Guarda todos os dados recebidos do servidor
+        let indiceAtual = 0;    // Controla qual o próximo dado a ser exibido
+        let dadosNaTela = [];   // Guarda apenas os dados visíveis na tabela (máximo 10)
+        let intervalId = null;  // Identificador do nosso loop de tempo
+
+        // Função principal que busca os dados e inicia a animação
+        async function iniciarAnimacao() {
             try {
                 const response = await fetch("/dados_json");
                 const data = await response.json();
 
-                if (data.error) {
+                if (data.error || !Array.isArray(data)) {
                     document.getElementById("tabela-container").innerHTML = 
-                        `<div class="loading">Erro: ${data.error}</div>`;
+                        `<div class="loading">Erro ao carregar dados: ${data.error || 'Formato inválido'}</div>`;
                     return;
                 }
 
-                let tabela = `
-                    <table>
-                        <thead>
-                            <tr>
-                                ${Object.keys(data[0]).map(col => `<th>${col}</th>`).join("")}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.map(linha => `
-                                <tr>
-                                    ${Object.values(linha).map(valor => `<td>${valor}</td>`).join("")}
-                                </tr>
-                            `).join("")}
-                        </tbody>
-                    </table>
-                `;
+                if (data.length === 0) {
+                    document.getElementById("tabela-container").innerHTML = 
+                        `<div class="loading">Nenhum dado para exibir.</div>`;
+                    return;
+                }
 
-                document.getElementById("tabela-container").innerHTML = tabela;
+                todosOsDados = data;
+
+                // Cria a estrutura da tabela (cabeçalho) apenas uma vez
+                criarTabelaComCabecalho(todosOsDados[0]);
+
+                // Inicia o loop que adiciona um novo dado a cada 2 segundos
+                intervalId = setInterval(adicionarProximoDado, 2000);
 
             } catch (error) {
                 document.getElementById("tabela-container").innerHTML = 
-                    `<div class="loading">Erro ao carregar dados: ${error}</div>`;
+                    `<div class="loading">Erro de conexão: ${error}</div>`;
             }
         }
 
-        // Carregar dados imediatamente e atualizar a cada 2 segundos
-        carregarDados();
-        setInterval(carregarDados, 2000);
+        // Cria a tabela vazia com o cabeçalho correto
+        function criarTabelaComCabecalho(primeiraLinha) {
+            const container = document.getElementById('tabela-container');
+            const colunas = Object.keys(primeiraLinha);
+            const tabelaHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            ${colunas.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- As linhas serão inseridas dinamicamente aqui -->
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = tabelaHTML;
+        }
+
+        // Função chamada a cada 2 segundos para atualizar a tabela
+        function adicionarProximoDado() {
+            // Se já exibimos todos os dados, para o loop
+            if (indiceAtual >= todosOsDados.length) {
+                clearInterval(intervalId);
+                return;
+            }
+
+            const novoDado = todosOsDados[indiceAtual];
+            dadosNaTela.push(novoDado); // Adiciona o novo dado no fim da lista
+
+            // Se a lista tiver mais de 10 itens, remove o primeiro (o mais antigo)
+            if (dadosNaTela.length > 10) {
+                dadosNaTela.shift();
+            }
+
+            renderizarTabela(); // Redesenha a tabela com os dados atualizados
+            indiceAtual++;      // Prepara para o próximo dado
+        }
+
+        // Limpa a tabela e a recria com os dados da lista 'dadosNaTela'
+        function renderizarTabela() {
+            const tbody = document.querySelector("#tabela-container table tbody");
+            if (!tbody) return;
+
+            tbody.innerHTML = ''; // Limpa as linhas existentes
+
+            // Cria e adiciona uma nova linha para cada item na lista
+            dadosNaTela.forEach(linha => {
+                const tr = document.createElement('tr');
+                const valores = Object.values(linha);
+                tr.innerHTML = valores.map(val => `<td>${val === null ? '' : val}</td>`).join('');
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Inicia todo o processo quando a página carrega
+        iniciarAnimacao();
     </script>
 </body>
 </html>
-
 
 
 
