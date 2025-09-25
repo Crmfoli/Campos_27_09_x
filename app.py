@@ -4,8 +4,8 @@ import os
 
 app = Flask(__name__)
 
-# Alterado para ler o ficheiro .csv, que é mais leve em memória
-DATA_FILE = os.path.join(os.path.dirname(__file__), "dados_sensores.csv")
+# Alterado de volta para ler o ficheiro .xlsx
+DATA_FILE = os.path.join(os.path.dirname(__file__), "dados_sensores.xlsx")
 
 
 # Rota inicial -> login
@@ -44,22 +44,12 @@ def dados():
 @app.route("/dados_json")
 def dados_json():
     try:
-        # Usamos read_csv, que é muito mais rápido e consome menos memória
-        df = pd.read_csv(DATA_FILE)
+        # Usamos read_excel para ler o ficheiro .xlsx
+        df = pd.read_excel(DATA_FILE)
 
         # A lógica para limpar os dados permanece a mesma, para garantir a compatibilidade com JSON
         
-        # Converte colunas de data/hora para string. O pandas pode ler datas do CSV como texto,
-        # então tentamos convertê-las primeiro para o formato datetime antes de formatar.
-        for col in df.columns:
-            # Tenta converter colunas que parecem ser datas para o formato datetime
-            if df[col].dtype == 'object':
-                try:
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                except (ValueError, TypeError):
-                    pass # Ignora colunas que não podem ser convertidas
-
-        # Agora, formata as colunas que foram convertidas para datetime
+        # Converte colunas de data/hora para string.
         for col in df.select_dtypes(include=['datetime64[ns]']).columns:
             df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').where(df[col].notna(), None)
 
@@ -80,7 +70,3 @@ def dados_json():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
-
-
