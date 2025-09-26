@@ -5,28 +5,52 @@ import numpy as np
 
 app = Flask(__name__)
 
-# --- Caminhos para os arquivos Excel ---
+# --- Caminhos dos Arquivos ---
 BASE_DIR = os.path.dirname(__file__)
 EXCEL_FILE_SENSORES = os.path.join(BASE_DIR, "dados_sensores.xlsx")
 EXCEL_FILE_PLUVIOMETRIA = os.path.join(BASE_DIR, "pluviometria.xlsx")
 
-# --- Função auxiliar para processar DataFrames ---
-def processar_dataframe(df):
-    """Converte datas para string e substitui NaN por None."""
-    for col in df.columns:
-        if pd.api.types.is_datetime64_any_dtype(df[col]):
-            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-    return df.replace({np.nan: None})
 
-# --- Rotas da Aplicação Principal ---
+# --- Funções Auxiliares de Leitura de Dados ---
+
+def ler_e_tratar_excel(caminho_arquivo, num_linhas=None):
+    """Lê um arquivo Excel e trata os dados para serem compatíveis com JSON."""
+    try:
+        df = pd.read_excel(caminho_arquivo, nrows=num_linhas)
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sem_nan = df.replace({np.nan: None, pd.NaT: None})
+        return df_sem_nan.to_dict(orient="records")
+    except FileNotFoundError:
+        return {"error": f"Arquivo não encontrado: {os.path.basename(caminho_arquivo)}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+def ler_cabecalho_excel(caminho_arquivo):
+    """Lê apenas o cabeçalho de um arquivo Excel de forma eficiente."""
+    try:
+        df = pd.read_excel(caminho_arquivo, nrows=0)
+        return df.columns.tolist()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# --- Rotas da Aplicação ---
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/login", methods=["POST"])
 def login():
-    # Lógica de login simplificada
-    return redirect(url_for("mapa"))
+    email = request.form.get("email")
+    senha = request.form.get("senha")
+    # ALTERAÇÃO: Validação do token removida
+    if email and senha:
+        return redirect(url_for("mapa"))
+    else:
+        return redirect(url_for("index"))
 
 @app.route("/mapa")
 def mapa():
@@ -38,47 +62,31 @@ def dados():
 
 # --- Rotas da API de Dados ---
 
-# --- DADOS DOS SENSORES ---
+# Dados dos Sensores de Umidade
 @app.route("/dados_json")
 def dados_json():
-    """Retorna todos os dados dos sensores."""
-    try:
-        df = pd.read_excel(EXCEL_FILE_SENSORES)
-        df_processado = processar_dataframe(df)
-        return jsonify(df_processado.to_dict(orient="records"))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(ler_e_tratar_excel(EXCEL_FILE_SENSORES))
 
 @app.route("/dados_iniciais")
 def dados_iniciais():
-    """NOVO: Retorna apenas os primeiros 20 registros dos sensores para carregamento rápido."""
-    try:
-        df = pd.read_excel(EXCEL_FILE_SENSORES, nrows=20)
-        df_processado = processar_dataframe(df)
-        return jsonify(df_processado.to_dict(orient="records"))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(ler_e_tratar_excel(EXCEL_FILE_SENSORES, num_linhas=20))
 
-# --- DADOS DE PLUVIOMETRIA ---
+@app.route("/dados_cabecalho")
+def dados_cabecalho():
+    return jsonify(ler_cabecalho_excel(EXCEL_FILE_SENSORES))
+
+# Dados de Pluviometria
 @app.route("/pluviometria_json")
 def pluviometria_json():
-    """Retorna todos os dados de pluviometria."""
-    try:
-        df = pd.read_excel(EXCEL_FILE_PLUVIOMETRIA)
-        df_processado = processar_dataframe(df)
-        return jsonify(df_processado.to_dict(orient="records"))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(ler_e_tratar_excel(EXCEL_FILE_PLUVIOMETRIA))
 
 @app.route("/pluviometria_iniciais")
 def pluviometria_iniciais():
-    """NOVO: Retorna apenas os primeiros 20 registros de pluviometria."""
-    try:
-        df = pd.read_excel(EXCEL_FILE_PLUVIOMETRIA, nrows=20)
-        df_processado = processar_dataframe(df)
-        return jsonify(df_processado.to_dict(orient="records"))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(ler_e_tratar_excel(EXCEL_FILE_PLUVIOMETRIA, num_linhas=20))
+
+@app.route("/pluviometria_cabecalho")
+def pluviometria_cabecalho():
+    return jsonify(ler_cabecalho_excel(EXCEL_FILE_PLUVIOMETRIA))
 
 
 if __name__ == "__main__":
