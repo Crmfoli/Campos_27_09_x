@@ -32,64 +32,90 @@
         </div>
 
         <div id="tabela-container">
-            <div class="loading">A carregar dados...</div>
+            <div class="loading">A carregar visualização...</div>
         </div>
     </div>
 
     <script>
-        // --- Variáveis e Configurações Globais ---
+        // --- Variáveis Globais ---
         let todosOsDadosSensores = [], indiceAtualSensores = 0, dadosNaTelaSensores = [], graficoSensores = null;
         let todosOsDadosPluviometria = [], indiceAtualPluviometria = 0, dadosNaTelaPluviometria = [], graficoPluviometria = null;
         let intervalId = null;
 
-        // Estilos para o gráfico de SENSORES DE UMIDADE
+        // --- Configurações de Estilo dos Gráficos ---
         const ESTILOS_SENSORES = [
             { color: 'rgb(128, 0, 128)', pointStyle: 'circle' }, { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },
             { color: 'rgb(0, 128, 0)', pointStyle: 'rect' }, { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },
             { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' }, { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
-
-        // Estilos para o novo gráfico da ESTAÇÃO METEOROLÓGICA
         const ESTILOS_ESTACAO = {
-            'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', pointStyle: 'rect', yAxisID: 'y' },
-            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', pointStyle: 'circle', yAxisID: 'y1' },
-            'Sucção': { type: 'line', color: 'rgb(75, 192, 192)', borderColor: 'rgb(75, 192, 192)', pointStyle: 'triangle', yAxisID: 'y1' },
-            '°C Temp_Solo': { type: 'line', color: 'rgb(255, 99, 132)', borderColor: 'rgb(255, 99, 132)', pointStyle: 'star', yAxisID: 'y1' }
+            'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', yAxisID: 'y' },
+            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', yAxisID: 'y1' },
+            'Sucção': { type: 'line', color: 'rgb(75, 192, 192)', borderColor: 'rgb(75, 192, 192)', yAxisID: 'y1' },
+            '°C Temp_Solo': { type: 'line', color: 'rgb(255, 99, 132)', borderColor: 'rgb(255, 99, 132)', yAxisID: 'y1' }
         };
-        const defaultEstacaoStyle = { type: 'line', color: 'rgb(100, 100, 100)', borderColor: 'rgb(100, 100, 100)', pointStyle: 'cross', yAxisID: 'y1' };
-
-
+        const defaultEstacaoStyle = { type: 'line', color: 'rgb(100, 100, 100)', yAxisID: 'y1' };
         const verticalLinePlugin = {
           id: 'verticalLine',
           afterDraw: (chart) => { if (chart.tooltip?._active?.length) { const ctx = chart.ctx; const x = chart.tooltip._active[0].element.x; const topY = chart.scales.y.top; const bottomY = chart.scales.y.bottom; ctx.save(); ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; ctx.stroke(); ctx.restore(); } }
         };
         
-        // --- Funções de Carregamento e Inicialização ---
+        // --- LÓGICA DE CARREGAMENTO OTIMIZADA ---
 
-        async function carregarTodosOsDados() {
+        async function iniciarTudo() {
             try {
-                const [responseSensores, responsePluviometria] = await Promise.all([
+                // ETAPA 1: Carrega os dados iniciais (rápido)
+                const [respIniciaisSensores, respIniciaisPluviometria] = await Promise.all([
+                    fetch("/dados_iniciais"),
+                    fetch("/pluviometria_iniciais")
+                ]);
+                todosOsDadosSensores = await respIniciaisSensores.json();
+                todosOsDadosPluviometria = await respIniciaisPluviometria.json();
+
+                if (todosOsDadosSensores.error || todosOsDadosPluviometria.error) throw new Error(todosOsDadosSensores.error || todosOsDadosPluviometria.error);
+                if (todosOsDadosSensores.length === 0 || todosOsDadosPluviometria.length === 0) throw new Error("Os arquivos de dados iniciais estão vazios.");
+
+
+                // ETAPA 2: Inicia a visualização imediatamente com os dados iniciais
+                iniciarVisualizacaoSensores();
+                iniciarVisualizacaoPluviometria();
+                intervalId = setInterval(adicionarProximoDado, 2000);
+
+                // ETAPA 3: Busca os dados completos em segundo plano
+                carregarDadosCompletos();
+
+            } catch (error) {
+                document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro ao iniciar: ${error.message}</div>`;
+            }
+        }
+
+        async function carregarDadosCompletos() {
+            try {
+                const [respCompletosSensores, respCompletosPluviometria] = await Promise.all([
                     fetch("/dados_json"),
                     fetch("/pluviometria_json")
                 ]);
-                todosOsDadosSensores = await responseSensores.json();
-                todosOsDadosPluviometria = await responsePluviometria.json();
+                const dadosCompletosSensores = await respCompletosSensores.json();
+                const dadosCompletosPluviometria = await respCompletosPluviometria.json();
 
-                if (todosOsDadosSensores.error || todosOsDadosPluviometria.error) {
-                    document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro: ${todosOsDadosSensores.error || todosOsDadosPluviometria.error}</div>`;
-                    return;
+                if (dadosCompletosSensores.error || dadosCompletosPluviometria.error) {
+                    console.error("Erro ao buscar dados completos:", dadosCompletosSensores.error || dadosCompletosPluviometria.error);
+                    return; // Continua com os dados iniciais se houver erro
                 }
                 
-                iniciarVisualizacaoSensores();
-                iniciarVisualizacaoPluviometria();
-                
-                intervalId = setInterval(adicionarProximoDado, 2000);
+                // ETAPA 4: Substitui os dados iniciais pelos completos de forma transparente
+                todosOsDadosSensores = dadosCompletosSensores;
+                todosOsDadosPluviometria = dadosCompletosPluviometria;
+                console.log("Dados completos carregados em segundo plano.");
 
             } catch (error) {
-                document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro de conexão: ${error}</div>`;
+                 console.error("Falha ao carregar dados completos em segundo plano:", error);
             }
         }
+
+
+        // --- Funções de Inicialização dos Gráficos e Tabela ---
 
         function iniciarVisualizacaoSensores() {
             const cabecalho = Object.keys(todosOsDadosSensores[0]);
@@ -107,13 +133,11 @@
             container.innerHTML = `<h2>Dados dos Sensores de Umidade</h2><table><thead><tr>${colunas.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
         }
 
-        // --- Funções dos Gráficos ---
-
         function iniciarGraficoSensores(colunas) {
             const ctx = document.getElementById('graficoSensores').getContext('2d');
             const datasets = colunas.slice(1).map((col, i) => ({
                 label: LABELS_PROFUNDIDADE[i] || col, data: [], borderColor: ESTILOS_SENSORES[i].color, backgroundColor: ESTILOS_SENSORES[i].color,
-                pointStyle: ESTILOS_SENSORES[i].pointStyle, pointRadius: 5, pointHoverRadius: 7, tension: 0.1, fill: false
+                pointStyle: ESTILOS_SENSORES[i].pointStyle, pointRadius: 5, tension: 0.1, fill: false
             }));
             graficoSensores = new Chart(ctx, {
                 type: 'line', data: { labels: [], datasets: datasets },
@@ -124,18 +148,13 @@
 
         function iniciarGraficoPluviometria(colunas) {
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
-            
-            // CORREÇÃO: Identifica a coluna de data e as colunas de dados
             const labelKey = 'data_hora';
             const dataColumns = colunas.filter(col => col !== labelKey);
-
             const datasets = dataColumns.map(col => {
                 const estilo = ESTILOS_ESTACAO[col] || defaultEstacaoStyle;
                 return {
                     label: col, data: [], type: estilo.type, borderColor: estilo.borderColor,
-                    backgroundColor: estilo.color, pointStyle: estilo.pointStyle, pointRadius: 5,
-                    pointHoverRadius: 7, tension: (estilo.type === 'line' ? 0.1 : 0),
-                    fill: false, yAxisID: estilo.yAxisID
+                    backgroundColor: estilo.color, tension: 0.1, fill: false, yAxisID: estilo.yAxisID
                 };
             });
 
@@ -143,10 +162,7 @@
                 type: 'bar', data: { labels: [], datasets: datasets },
                 options: { 
                     responsive: true, interaction: { mode: 'index', intersect: false }, 
-                    plugins: { 
-                        legend: { position: 'bottom' },
-                        tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { label += context.parsed.y.toFixed(2); if (context.dataset.label === 'Precipitação' || context.dataset.label === 'Precipitação Acumulada') { label += ' mm'; } else if (context.dataset.label === '°C Temp_Solo') { label += ' °C'; } } return label; } } }
-                    }, 
+                    plugins: { legend: { position: 'bottom' } }, 
                     scales: { 
                         x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
                         y: { position: 'left', title: { display: true, text: 'Precipitação (mm)' }, beginAtZero: true },
@@ -157,68 +173,52 @@
             });
         }
 
-        // --- Funções de Atualização (Loop) ---
+        // --- Funções de Atualização (Loop Principal) ---
 
         function adicionarProximoDado() {
-            let continuar = false;
+            let continuarAnimacao = false;
+            
             if (indiceAtualSensores < todosOsDadosSensores.length) {
                 dadosNaTelaSensores.unshift(todosOsDadosSensores[indiceAtualSensores++]); 
                 if (dadosNaTelaSensores.length > 10) dadosNaTelaSensores.pop();
-                continuar = true;
+                continuarAnimacao = true;
             }
             if (indiceAtualPluviometria < todosOsDadosPluviometria.length) {
                 dadosNaTelaPluviometria.unshift(todosOsDadosPluviometria[indiceAtualPluviometria++]);
                 if (dadosNaTelaPluviometria.length > 10) dadosNaTelaPluviometria.pop();
-                continuar = true;
+                continuarAnimacao = true;
             }
 
             renderizarTabelaSensores(); 
             atualizarGraficoSensores();
             atualizarGraficoPluviometria();
 
-            if (!continuar) clearInterval(intervalId);
+            if (!continuarAnimacao) clearInterval(intervalId);
         }
 
         function renderizarTabelaSensores() {
             const tbody = document.querySelector("#tabela-container table tbody");
-            if (!tbody) return;
-            tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
+            if (tbody) tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
         }
 
-        function atualizarGraficoSensores() {
-            if (!graficoSensores || dadosNaTelaSensores.length === 0) return;
-            const dadosParaGrafico = [...dadosNaTelaSensores].reverse();
-            const labelKey = Object.keys(dadosParaGrafico[0])[0];
-            graficoSensores.data.labels = dadosParaGrafico.map(d => d[labelKey]);
-            Object.keys(dadosParaGrafico[0]).slice(1).forEach((coluna, index) => {
-                if (graficoSensores.data.datasets[index])
-                    graficoSensores.data.datasets[index].data = dadosParaGrafico.map(d => d[coluna]);
-            });
-            graficoSensores.update(); 
-        }
-
-        function atualizarGraficoPluviometria() {
-            if (!graficoPluviometria || dadosNaTelaPluviometria.length === 0) return;
-            const dadosParaGrafico = [...dadosNaTelaPluviometria].reverse();
+        function atualizarGrafico(grafico, dadosNaTela, labelKeyOverride = null) {
+            if (!grafico || dadosNaTela.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTela].reverse();
+            const labelKey = labelKeyOverride || Object.keys(dadosParaGrafico[0])[0];
             
-            // CORREÇÃO: Usa a coluna 'data_hora' para o eixo X
-            const labelKey = 'data_hora';
-            graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
-            
-            // Atualiza cada dataset com base no seu label (nome da coluna)
-            graficoPluviometria.data.datasets.forEach(dataset => {
+            grafico.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            grafico.data.datasets.forEach(dataset => {
                 const columnName = dataset.label;
-                if (columnName !== labelKey) {
-                     dataset.data = dadosParaGrafico.map(d => d[columnName]);
-                }
+                dataset.data = dadosParaGrafico.map(d => d[columnName]);
             });
-
-            graficoPluviometria.update();
+            grafico.update();
         }
+
+        const atualizarGraficoSensores = () => atualizarGrafico(graficoSensores, dadosNaTelaSensores);
+        const atualizarGraficoPluviometria = () => atualizarGrafico(graficoPluviometria, dadosNaTelaPluviometria, 'data_hora');
         
-        carregarTodosOsDados();
+        // Inicia todo o processo
+        iniciarTudo();
     </script>
 </body>
 </html>
-
-
