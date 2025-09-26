@@ -9,26 +9,47 @@
         body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
         .container { width: 90%; margin: 20px auto; }
+        /* ALTERAÇÃO: Estilo para o novo título */
+        .info-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .info-header h2 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+        }
+        .info-header p {
+            margin: 4px 0 0;
+            font-size: 1em;
+            color: #555;
+        }
         .grafico-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        /* ALTERAÇÃO: Limita a altura máxima dos gráficos */
         .grafico-container canvas {
             max-height: 40vh;
         }
         .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
-        h2 { text-align: center; color: #333; font-weight: 500; }
+        h2.grafico-titulo { text-align: center; color: #333; font-weight: 500; } /* Classe específica para o título do gráfico */
     </style>
 </head>
 <body>
     <header>📊 Dados de Monitoramento</header>
 
     <div class="container">
+        <!-- ALTERAÇÃO: Título adicionado aqui -->
+        <div class="info-header">
+            <h2>Município: CAMPOS DO JORDÃO/SP</h2>
+            <p>Estação: Vila Abernéssia</p>
+        </div>
+
         <div class="grafico-container">
-            <h2>Estação Meteorológica</h2>
+            <h2 class="grafico-titulo">Estação Meteorológica</h2>
             <canvas id="graficoPluviometria"></canvas>
         </div>
 
         <div class="grafico-container">
-            <h2>Umidade do Solo</h2>
+            <h2 class="grafico-titulo">Umidade do Solo</h2>
             <canvas id="graficoSensores"></canvas>
         </div>
 
@@ -127,7 +148,7 @@
                 type: 'line', data: { labels: [], datasets: datasets },
                 options: { 
                     responsive: true, 
-                    maintainAspectRatio: false, // Permite que o CSS controle a altura
+                    maintainAspectRatio: false, 
                     interaction: { mode: 'index', intersect: false }, 
                     plugins: { legend: { position: 'bottom' } }, 
                     scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Umidade Volumetrica (%)' } } } 
@@ -164,7 +185,7 @@
                 type: 'bar', data: { labels: [], datasets: datasets },
                 options: { 
                     responsive: true,
-                    maintainAspectRatio: false, // Permite que o CSS controle a altura
+                    maintainAspectRatio: false, 
                     interaction: { mode: 'index', intersect: false }, 
                     plugins: { legend: { position: 'bottom' } }, 
                     scales: { 
