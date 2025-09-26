@@ -49,13 +49,13 @@
             { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' }, { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
+        
+        // ALTERAÇÃO: Removidos dados de Sucção e Temp_Solo
         const ESTILOS_ESTACAO = {
             'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', yAxisID: 'y' },
-            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', yAxisID: 'y1' },
-            'Sucção': { type: 'line', color: 'rgb(75, 192, 192)', borderColor: 'rgb(75, 192, 192)', yAxisID: 'y1' },
-            '°C Temp_Solo': { type: 'line', color: 'rgb(255, 99, 132)', borderColor: 'rgb(255, 99, 132)', yAxisID: 'y1' }
+            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', yAxisID: 'y1' }
         };
-        const defaultEstacaoStyle = { type: 'line', color: 'rgb(100, 100, 100)', yAxisID: 'y1' };
+
         const verticalLinePlugin = {
           id: 'verticalLine',
           afterDraw: (chart) => { if (chart.tooltip?._active?.length) { const ctx = chart.ctx; const x = chart.tooltip._active[0].element.x; const topY = chart.scales.y.top; const bottomY = chart.scales.y.bottom; ctx.save(); ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; ctx.stroke(); ctx.restore(); } }
@@ -149,9 +149,12 @@
         function iniciarGraficoPluviometria(colunas) {
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
             const labelKey = 'data_hora';
-            const dataColumns = colunas.filter(col => col !== labelKey);
+            
+            // ALTERAÇÃO: Filtra apenas as colunas que queremos mostrar
+            const dataColumns = colunas.filter(col => ESTILOS_ESTACAO[col]);
+
             const datasets = dataColumns.map(col => {
-                const estilo = ESTILOS_ESTACAO[col] || defaultEstacaoStyle;
+                const estilo = ESTILOS_ESTACAO[col];
                 return {
                     label: col, data: [], type: estilo.type, borderColor: estilo.borderColor,
                     backgroundColor: estilo.color, tension: 0.1, fill: false, yAxisID: estilo.yAxisID
@@ -166,7 +169,8 @@
                     scales: { 
                         x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
                         y: { position: 'left', title: { display: true, text: 'Precipitação (mm)' }, beginAtZero: true },
-                        y1: { position: 'right', title: { display: true, text: 'Outros Valores' }, beginAtZero: false, grid: { drawOnChartArea: false } }
+                        // ALTERAÇÃO: Nome do eixo Y secundário mais específico
+                        y1: { position: 'right', title: { display: true, text: 'Acumulado (mm)' }, beginAtZero: false, grid: { drawOnChartArea: false } }
                     } 
                 },
                 plugins: [verticalLinePlugin]
@@ -200,13 +204,12 @@
             const tbody = document.querySelector("#tabela-container table tbody");
             if (tbody) tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
         }
-
-        // CORREÇÃO: Funções de atualização dos gráficos separadas e mais robustas
+        
         function atualizarGraficoSensores() {
             if (!graficoSensores || dadosNaTelaSensores.length === 0) return;
             const dadosParaGrafico = [...dadosNaTelaSensores].reverse();
             const colunas = Object.keys(dadosParaGrafico[0]);
-            const labelKey = colunas[0]; // Assume que a primeira coluna é a de data/hora
+            const labelKey = colunas[0]; 
             const dataColumns = colunas.slice(1);
             
             graficoSensores.data.labels = dadosParaGrafico.map(d => d[labelKey]);
@@ -235,8 +238,8 @@
             graficoPluviometria.update();
         }
         
-        // Inicia todo o processo
         iniciarTudo();
     </script>
 </body>
 </html>
+
