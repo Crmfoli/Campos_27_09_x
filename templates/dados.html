@@ -28,7 +28,6 @@
             <canvas id="graficoSensores"></canvas>
         </div>
 
-        <!-- ALTERAÇÃO: Tabela de dados removida -->
         <div id="tabela-container" style="display: none;">
             <div class="loading">A carregar visualização...</div>
         </div>
@@ -48,10 +47,8 @@
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
         
-        const ESTILOS_ESTACAO = {
-            'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', yAxisID: 'y' },
-            'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', yAxisID: 'y1' }
-        };
+        // ALTERAÇÃO: Apenas o estilo da precipitação é necessário, o acumulado será gerado dinamicamente
+        const ESTILO_PRECIPITACAO = { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)' };
 
         const verticalLinePlugin = {
           id: 'verticalLine',
@@ -62,7 +59,6 @@
 
         async function iniciarTudo() {
             try {
-                // ETAPA 1: Carrega os dados iniciais (rápido)
                 const [respIniciaisSensores, respIniciaisPluviometria] = await Promise.all([
                     fetch("/dados_iniciais"),
                     fetch("/pluviometria_iniciais")
@@ -73,13 +69,10 @@
                 if (todosOsDadosSensores.error || todosOsDadosPluviometria.error) throw new Error(todosOsDadosSensores.error || todosOsDadosPluviometria.error);
                 if (todosOsDadosSensores.length === 0 || todosOsDadosPluviometria.length === 0) throw new Error("Os arquivos de dados iniciais estão vazios.");
 
-
-                // ETAPA 2: Inicia a visualização imediatamente com os dados iniciais
                 iniciarVisualizacaoSensores();
                 iniciarVisualizacaoPluviometria();
                 intervalId = setInterval(adicionarProximoDado, 2000);
 
-                // ETAPA 3: Busca os dados completos em segundo plano
                 carregarDadosCompletos();
 
             } catch (error) {
@@ -98,10 +91,9 @@
 
                 if (dadosCompletosSensores.error || dadosCompletosPluviometria.error) {
                     console.error("Erro ao buscar dados completos:", dadosCompletosSensores.error || dadosCompletosPluviometria.error);
-                    return; // Continua com os dados iniciais se houver erro
+                    return;
                 }
                 
-                // ETAPA 4: Substitui os dados iniciais pelos completos de forma transparente
                 todosOsDadosSensores = dadosCompletosSensores;
                 todosOsDadosPluviometria = dadosCompletosPluviometria;
                 console.log("Dados completos carregados em segundo plano.");
@@ -111,8 +103,7 @@
             }
         }
 
-
-        // --- Funções de Inicialização dos Gráficos e Tabela ---
+        // --- Funções de Inicialização dos Gráficos ---
 
         function iniciarVisualizacaoSensores() {
             const cabecalho = Object.keys(todosOsDadosSensores[0]);
@@ -120,8 +111,7 @@
         }
 
         function iniciarVisualizacaoPluviometria() {
-            const cabecalho = Object.keys(todosOsDadosPluviometria[0]);
-            iniciarGraficoPluviometria(cabecalho);
+            iniciarGraficoPluviometria();
         }
 
         function iniciarGraficoSensores(colunas) {
@@ -137,19 +127,30 @@
             });
         }
 
-        function iniciarGraficoPluviometria(colunas) {
+        function iniciarGraficoPluviometria() {
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
-            const labelKey = 'data_hora';
             
-            const dataColumns = colunas.filter(col => ESTILOS_ESTACAO[col]);
-
-            const datasets = dataColumns.map(col => {
-                const estilo = ESTILOS_ESTACAO[col];
-                return {
-                    label: col, data: [], type: estilo.type, borderColor: estilo.borderColor,
-                    backgroundColor: estilo.color, tension: 0.1, fill: false, yAxisID: estilo.yAxisID
-                };
-            });
+            // ALTERAÇÃO: Define os datasets manualmente
+            const datasets = [
+                {
+                    label: 'Pluviometria (mm)',
+                    data: [],
+                    type: ESTILO_PRECIPITACAO.type,
+                    backgroundColor: ESTILO_PRECIPITACAO.color,
+                    borderColor: ESTILO_PRECIPITACAO.borderColor
+                },
+                {
+                    label: 'Precipitação Acumulada (mm)',
+                    data: [],
+                    type: 'line',
+                    borderColor: 'rgb(0, 0, 0)',
+                    backgroundColor: 'rgb(0, 0, 0)',
+                    pointStyle: 'circle',
+                    pointRadius: 4,
+                    tension: 0.1,
+                    fill: false
+                }
+            ];
 
             graficoPluviometria = new Chart(ctx, {
                 type: 'bar', data: { labels: [], datasets: datasets },
@@ -158,9 +159,8 @@
                     plugins: { legend: { position: 'bottom' } }, 
                     scales: { 
                         x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
-                        // ALTERAÇÃO: Escala do eixo Y da precipitação fixada entre 0 e 5
-                        y: { position: 'left', title: { display: true, text: 'Precipitação (mm)' }, min: 0, max: 5 },
-                        y1: { position: 'right', title: { display: true, text: 'Acumulado (mm)' }, beginAtZero: false, grid: { drawOnChartArea: false } }
+                        // ALTERAÇÃO: Apenas um eixo Y com escala automática
+                        y: { position: 'left', title: { display: true, text: 'Pluviometria (mm)' }, beginAtZero: true }
                     } 
                 },
                 plugins: [verticalLinePlugin]
@@ -213,12 +213,18 @@
             
             graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
             
-            graficoPluviometria.data.datasets.forEach(dataset => {
-                const columnName = dataset.label;
-                if (columnName !== labelKey) {
-                     dataset.data = dadosParaGrafico.map(d => d[columnName]);
-                }
+            // Atualiza os dados de Pluviometria (barras)
+            const datasetPluviometria = graficoPluviometria.data.datasets[0];
+            datasetPluviometria.data = dadosParaGrafico.map(d => d['Precipitação']);
+
+            // ALTERAÇÃO: Calcula e atualiza a precipitação acumulada dinamicamente
+            const datasetAcumulado = graficoPluviometria.data.datasets[1];
+            let acumulado = 0;
+            datasetAcumulado.data = dadosParaGrafico.map(d => {
+                acumulado += (d['Precipitação'] || 0);
+                return acumulado.toFixed(2); // Arredonda para 2 casas decimais
             });
+
             graficoPluviometria.update();
         }
         
