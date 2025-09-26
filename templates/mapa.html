@@ -26,10 +26,9 @@
 
     // Define um popup inicial com mensagem de carregamento
     marker.bindPopup("<b>Sensor</b><br>A carregar dados de chuva...");
-    marker.openPopup();
 
     // Função para buscar o acumulado de chuva e atualizar o popup
-    async function buscarAcumulado() {
+    async function buscarAcumulado(abrirPopup = false) {
       try {
         const response = await fetch('/ultimo_acumulado');
         const data = await response.json();
@@ -38,24 +37,30 @@
         if (data.error) {
           popupContent += `Erro: ${data.error}`;
         } else {
-          // Exibe o acumulado dos últimos registros, que é mais dinâmico
           popupContent += `Chuva Recente: <b>${data.acumulado} mm</b>`;
         }
         popupContent += "<br><br><i>Clique no pino para ver os gráficos.</i>";
         
-        // Atualiza o conteúdo do popup
         marker.setPopupContent(popupContent);
+
+        // CORREÇÃO: Abre o popup apenas na primeira vez que os dados são carregados
+        if (abrirPopup) {
+          marker.openPopup();
+        }
         
       } catch (error) {
         marker.setPopupContent("<b>Sensor</b><br>Falha na conexão.<br><br><i>Clique para ver os gráficos.</i>");
+        if (abrirPopup) {
+          marker.openPopup();
+        }
       }
     }
     
-    // Carrega os dados imediatamente ao abrir a página
-    buscarAcumulado();
+    // Carrega os dados imediatamente e sinaliza para abrir o popup
+    buscarAcumulado(true);
 
-    // ALTERAÇÃO: Atualiza o valor a cada 2 segundos para simular "tempo real"
-    setInterval(buscarAcumulado, 2000); // 2000 ms = 2 segundos
+    // Atualiza o valor a cada 2 segundos
+    setInterval(buscarAcumulado, 2000);
 
     // Evento de clique no pino → abre a página de dados
     marker.on('click', function () {
@@ -64,3 +69,4 @@
   </script>
 </body>
 </html>
+
