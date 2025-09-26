@@ -24,43 +24,60 @@
 
     var marker = L.marker(localizacao).addTo(map);
 
-    // Define um popup inicial com mensagem de carregamento
-    marker.bindPopup("<b>Sensor</b><br>A carregar dados de chuva...");
+    // Define o popup inicial e o abre
+    marker.bindPopup("<b>Sensor</b><br>A iniciar monitoramento...");
+    marker.openPopup();
 
-    // Função para buscar o acumulado de chuva e atualizar o popup
-    async function buscarAcumulado(abrirPopup = false) {
+    /**
+     * Função especialista para carregar os dados de chuva e simular
+     * o cálculo do acumulado em tempo real, atualizando o pino do mapa.
+     */
+    async function iniciarMonitoramentoDinamico() {
       try {
-        const response = await fetch('/ultimo_acumulado');
-        const data = await response.json();
+        // 1. Busca todos os dados de pluviometria de uma só vez
+        const response = await fetch('/pluviometria_json');
+        const dadosDeChuva = await response.json();
 
-        let popupContent = "<b>Sensor</b><br>";
-        if (data.error) {
-          popupContent += `Erro: ${data.error}`;
-        } else {
-          popupContent += `Chuva Recente: <b>${data.acumulado} mm</b>`;
+        if (dadosDeChuva.error || !Array.isArray(dadosDeChuva) || dadosDeChuva.length === 0) {
+          throw new Error(dadosDeChuva.error || "Nenhum dado de chuva encontrado.");
         }
-        popupContent += "<br><br><i>Clique no pino para ver os gráficos.</i>";
-        
-        marker.setPopupContent(popupContent);
 
-        // CORREÇÃO: Abre o popup apenas na primeira vez que os dados são carregados
-        if (abrirPopup) {
-          marker.openPopup();
-        }
+        // 2. Inicia as variáveis para a simulação
+        let acumulado = 0;
+        let indiceAtual = 0;
         
+        // 3. Cria um intervalo que processa um dado a cada 2 segundos
+        const processador = setInterval(() => {
+          // Se ainda houver dados para processar
+          if (indiceAtual < dadosDeChuva.length) {
+            const dado = dadosDeChuva[indiceAtual];
+            // Garante que o valor da precipitação é um número
+            const precipitacao = parseFloat(dado['Precipitação']) || 0;
+            acumulado += precipitacao;
+
+            // 4. Atualiza o conteúdo do popup com o novo valor acumulado
+            const popupContent = `
+              <b>Sensor</b><br>
+              Acumulado Dinâmico: <b>${acumulado.toFixed(2)} mm</b>
+              <br><br><i>Clique no pino para ver os gráficos.</i>
+            `;
+            marker.setPopupContent(popupContent);
+
+            indiceAtual++;
+          } else {
+            // 5. Se todos os dados foram processados, para o intervalo
+            clearInterval(processador);
+            console.log("Monitoramento dinâmico concluído. Todos os dados foram processados.");
+          }
+        }, 2000); // A cada 2 segundos
+
       } catch (error) {
-        marker.setPopupContent("<b>Sensor</b><br>Falha na conexão.<br><br><i>Clique para ver os gráficos.</i>");
-        if (abrirPopup) {
-          marker.openPopup();
-        }
+        marker.setPopupContent(`<b>Sensor</b><br>Falha no monitoramento: ${error.message}`);
       }
     }
     
-    // Carrega os dados imediatamente e sinaliza para abrir o popup
-    buscarAcumulado(true);
-
-    // Atualiza o valor a cada 2 segundos
-    setInterval(buscarAcumulado, 2000);
+    // Inicia todo o processo assim que a página carrega
+    iniciarMonitoramentoDinamico();
 
     // Evento de clique no pino → abre a página de dados
     marker.on('click', function () {
@@ -69,4 +86,3 @@
   </script>
 </body>
 </html>
-
