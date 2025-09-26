@@ -3,49 +3,49 @@ import pandas as pd
 import os
 import numpy as np
 from datetime import datetime, timedelta
+from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 
-# --- Constantes de Caminho dos Arquivos ---
+# --- CONFIGURAÇÃO DO BANCO DE DADOS (SOLUÇÃO 3) ---
 BASE_DIR = os.path.dirname(__file__)
-EXCEL_SENSORES = os.path.join(BASE_DIR, "dados_sensores.xlsx")
-EXCEL_PLUVIOMETRIA = os.path.join(BASE_DIR, "pluviometria.xlsx")
+DB_FILE = os.path.join(BASE_DIR, "sensores.db")
+DB_URL = f"sqlite:///{DB_FILE}"
+engine = create_engine(DB_URL)
 
-# --- SOLUÇÃO DE PERFORMANCE: CACHE EM MEMÓRIA ---
-_cache = {}
-CACHE_TIMEOUT = timedelta(minutes=5) # Define que os dados ficarão em cache por 5 minutos
-
-def get_cached_excel_data(caminho_arquivo, num_linhas=None):
+def inicializar_banco_de_dados():
     """
-    Função especialista que busca dados do cache ou lê o arquivo Excel se o cache estiver expirado.
+    Função especialista que verifica se o banco de dados existe.
+    Se não existir, lê os arquivos Excel uma única vez e migra os dados.
     """
-    cache_key = f"{caminho_arquivo}_{num_linhas}"
-    agora = datetime.now()
-
-    # Se o dado está no cache e não expirou, retorna imediatamente.
-    if cache_key in _cache:
-        dados, timestamp = _cache[cache_key]
-        if agora - timestamp < CACHE_TIMEOUT:
-            print(f"CACHE HIT: Retornando dados rápidos para {os.path.basename(caminho_arquivo)}")
-            return dados
-
-    # Se não está no cache ou expirou, lê o arquivo (operação lenta).
-    print(f"CACHE MISS: Lendo arquivo {os.path.basename(caminho_arquivo)} do disco.")
-    try:
-        df = pd.read_excel(caminho_arquivo, nrows=num_linhas)
-        for col in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col]):
-                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-        dados_limpos = df.replace({np.nan: None}).to_dict(orient="records")
+    if not os.path.exists(DB_FILE):
+        print("="*50)
+        print(f"BANCO DE DADOS NÃO ENCONTRADO EM: {DB_FILE}")
+        print("Iniciando migração única dos arquivos Excel para o banco de dados...")
+        print("Este processo pode demorar um pouco, mas só acontece uma vez.")
+        print("="*50)
         
-        # Armazena os novos dados e o tempo atual no cache.
-        _cache[cache_key] = (dados_limpos, agora)
-        return dados_limpos
-        
-    except FileNotFoundError:
-        return {"error": f"Arquivo não encontrado: {os.path.basename(caminho_arquivo)}"}
-    except Exception as e:
-        return {"error": str(e)}
+        try:
+            # Caminhos para os arquivos Excel originais
+            excel_sensores = os.path.join(BASE_DIR, "dados_sensores.xlsx")
+            excel_pluviometria = os.path.join(BASE_DIR, "pluviometria.xlsx")
+
+            # Lê os dados dos arquivos Excel
+            df_sensores = pd.read_excel(excel_sensores)
+            df_pluviometria = pd.read_excel(excel_pluviometria)
+
+            # Salva os dataframes como tabelas no banco de dados SQLite
+            df_sensores.to_sql('sensores_umidade', engine, if_exists='replace', index=False)
+            df_pluviometria.to_sql('pluviometria', engine, if_exists='replace', index=False)
+
+            print("SUCESSO: Migração dos dados para o banco de dados concluída!")
+        except Exception as e:
+            print(f"ERRO CRÍTICO DURANTE A MIGRAÇÃO: {e}")
+            # Se a migração falhar, o programa para para evitar mais erros.
+            exit()
+
+# Executa a verificação e possível migração assim que a aplicação inicia
+inicializar_banco_de_dados()
 
 # --- Rotas Principais da Aplicação ---
 
@@ -70,15 +70,20 @@ def dados():
     return render_template("dados.html")
 
 
-# --- API de Dados (AGORA USANDO O CACHE) ---
+# --- API DE DADOS (AGORA LENDO DO BANCO DE DADOS) ---
+
+def formatar_dataframe_para_json(df):
+    """Trata os dados lidos do banco para serem compatíveis com JSON."""
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+    return df.replace({np.nan: None}).to_dict(orient="records")
 
 @app.route("/acumulado_72h")
 def acumulado_72h():
-    # Esta função ainda lê o arquivo diretamente para garantir o cálculo mais recente.
-    # Otimizações futuras podem cachear este resultado também.
     try:
-        df = pd.read_excel(EXCEL_PLUVIOMETRIA)
-        df['data_hora'] = pd.to_datetime(df['data_hora'])
+        # A consulta SQL é muito mais rápida do que processar com pandas
+        df = pd.read_sql_table('pluviometria', engine, parse_dates=['data_hora'])
         limite_tempo = datetime.now() - timedelta(hours=72)
         df_recente = df[df['data_hora'] >= limite_tempo]
         acumulado = df_recente['Precipitação'].sum()
@@ -89,22 +94,27 @@ def acumulado_72h():
 # SENSORES DE UMIDADE
 @app.route("/dados_json")
 def dados_json():
-    return jsonify(get_cached_excel_data(EXCEL_SENSORES))
+    df = pd.read_sql_table('sensores_umidade', engine)
+    return jsonify(formatar_dataframe_para_json(df))
 
 @app.route("/dados_iniciais")
 def dados_iniciais():
-    return jsonify(get_cached_excel_data(EXCEL_SENSORES, num_linhas=20))
+    df = pd.read_sql_query("SELECT * FROM sensores_umidade LIMIT 20", engine)
+    return jsonify(formatar_dataframe_para_json(df))
 
 # PLUVIOMETRIA
 @app.route("/pluviometria_json")
 def pluviometria_json():
-    return jsonify(get_cached_excel_data(EXCEL_PLUVIOMETRIA))
+    df = pd.read_sql_table('pluviometria', engine)
+    return jsonify(formatar_dataframe_para_json(df))
 
 @app.route("/pluviometria_iniciais")
 def pluviometria_iniciais():
-    return jsonify(get_cached_excel_data(EXCEL_PLUVIOMETRIA, num_linhas=20))
+    df = pd.read_sql_query("SELECT * FROM pluviometria LIMIT 20", engine)
+    return jsonify(formatar_dataframe_para_json(df))
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
