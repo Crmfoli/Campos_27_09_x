@@ -151,8 +151,34 @@
                     responsive: true, 
                     maintainAspectRatio: false, 
                     interaction: { mode: 'index', intersect: false }, 
-                    plugins: { legend: { position: 'bottom' } }, 
-                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Umidade Volumetrica (%)' } } } 
+                    plugins: { 
+                        legend: { position: 'bottom' },
+                        // ALTERAÇÃO: Formata o tooltip para exibir porcentagem
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) {
+                                        label += (context.parsed.y * 100).toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
+                        y: { 
+                            title: { display: true, text: 'Umidade Volumetrica (%)' },
+                            // ALTERAÇÃO: Formata o eixo Y para exibir porcentagem
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100).toFixed(0) + '%';
+                                }
+                            }
+                        } 
+                    } 
                 },
                 plugins: [verticalLinePlugin]
             });
