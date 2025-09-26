@@ -18,8 +18,9 @@
     // Coordenadas fornecidas
     var localizacao = [-22.741620, -45.598395];
 
-    // Cria o mapa
-    var map = L.map('map').setView(localizacao, 15);
+    // Cria o mapa com o novo nível de zoom
+    // ALTERAÇÃO: O valor do zoom foi alterado de 15 para 9
+    var map = L.map('map').setView(localizacao, 9);
 
     // Camada do mapa (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -39,3 +40,5 @@
   </script>
 </body>
 </html>
+
+
