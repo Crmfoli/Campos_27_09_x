@@ -9,10 +9,10 @@
         body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
         .container { width: 90%; margin: 20px auto; }
-        /* ALTERAÇÃO: Estilo para o novo título */
+        /* Estilo para o título dentro de cada gráfico */
         .info-header {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 15px; /* Reduzido o espaçamento inferior */
         }
         .info-header h2 {
             margin: 0;
@@ -30,26 +30,27 @@
             max-height: 40vh;
         }
         .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
-        h2.grafico-titulo { text-align: center; color: #333; font-weight: 500; } /* Classe específica para o título do gráfico */
     </style>
 </head>
 <body>
     <header>📊 Dados de Monitoramento</header>
 
     <div class="container">
-        <!-- ALTERAÇÃO: Título adicionado aqui -->
-        <div class="info-header">
-            <h2>Município: CAMPOS DO JORDÃO/SP</h2>
-            <p>Estação: Vila Abernéssia</p>
-        </div>
-
         <div class="grafico-container">
-            <h2 class="grafico-titulo">Estação Meteorológica</h2>
+            <!-- Título movido para dentro do contêiner do gráfico -->
+            <div class="info-header">
+                <h2>Município: CAMPOS DO JORDÃO/SP</h2>
+                <p>Estação: Vila Abernéssia</p>
+            </div>
             <canvas id="graficoPluviometria"></canvas>
         </div>
 
         <div class="grafico-container">
-            <h2 class="grafico-titulo">Umidade do Solo</h2>
+             <!-- Título movido para dentro do contêiner do gráfico -->
+            <div class="info-header">
+                <h2>Município: CAMPOS DO JORDÃO/SP</h2>
+                <p>Estação: Vila Abernéssia</p>
+            </div>
             <canvas id="graficoSensores"></canvas>
         </div>
 
