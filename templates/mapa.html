@@ -9,6 +9,16 @@
   <style>
     body { margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
+    /* Estilo para a tooltip minimalista */
+    .leaflet-tooltip-permanent {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: black;
+        text-shadow: 1px 1px 2px white; /* Sombra para melhorar a legibilidade */
+    }
   </style>
 </head>
 <body>
@@ -24,9 +34,8 @@
 
     var marker = L.marker(localizacao).addTo(map);
 
-    // Define o popup inicial e o abre
-    marker.bindPopup("<b>Sensor</b><br>A carregar dados...");
-    marker.openPopup();
+    // ALTERAÇÃO: Usa uma tooltip permanente em vez de um popup
+    marker.bindTooltip("...", { permanent: true, direction: 'top', offset: [0, -10] }).openTooltip();
 
     /**
      * Função especialista para buscar e exibir o acumulado de chuva das últimas 72 horas.
@@ -36,18 +45,18 @@
         const response = await fetch('/acumulado_72h');
         const data = await response.json();
 
-        let popupContent = "<b>Sensor</b><br>";
+        let tooltipContent = ""; // Começa com o conteúdo vazio
         if (data.error) {
-          popupContent += `Erro ao calcular: ${data.error}`;
+          tooltipContent = "Erro"; // Exibe "Erro" se houver falha
         } else {
-          popupContent += `Acumulado (72h): <b>${data.acumulado_72h} mm</b>`;
+          // ALTERAÇÃO: Mostra apenas o número bruto, sem texto ou unidade
+          tooltipContent = `${data.acumulado_72h}`; 
         }
-        popupContent += "<br><br><i>Clique no pino para ver os gráficos.</i>";
         
-        marker.setPopupContent(popupContent);
+        marker.setTooltipContent(tooltipContent);
         
       } catch (error) {
-        marker.setPopupContent(`<b>Sensor</b><br>Falha na conexão ao servidor.`);
+        marker.setTooltipContent(`-`); // Exibe um traço em caso de falha de conexão
       }
     }
     
@@ -57,11 +66,12 @@
     // Configura um intervalo para atualizar o dado a cada 1 minuto (60000 ms)
     setInterval(buscarAcumulado72h, 60000);
 
-    // Evento de clique no pino → abre a página de dados
+    // O evento de clique continua funcionando para abrir os gráficos
     marker.on('click', function () {
       window.open("/dados", "_blank");
     });
   </script>
 </body>
 </html>
+
 
