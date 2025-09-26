@@ -88,29 +88,20 @@ def pluviometria_iniciais():
 def pluviometria_cabecalho():
     return jsonify(ler_cabecalho_excel(EXCEL_FILE_PLUVIOMETRIA))
 
-# ROTA OTIMIZADA: Lê o arquivo de forma eficiente para obter o acumulado total
+# ALTERAÇÃO: Rota agora calcula o acumulado dos últimos 20 registros
 @app.route("/ultimo_acumulado")
 def ultimo_acumulado():
     try:
-        workbook = openpyxl.load_workbook(EXCEL_FILE_PLUVIOMETRIA, read_only=True)
-        sheet = workbook.active
+        # Usa pandas para pegar eficientemente as últimas 20 linhas
+        df = pd.read_excel(EXCEL_FILE_PLUVIOMETRIA)
+        df_ultimos_20 = df.tail(20)
 
-        header = [cell.value for cell in sheet[1]]
-        try:
-            precipitacao_index = header.index('Precipitação')
-        except ValueError:
+        if 'Precipitação' in df_ultimos_20.columns:
+            # Soma a precipitação apenas dos últimos 20 registros
+            acumulado_recente = pd.to_numeric(df_ultimos_20['Precipitação'], errors='coerce').sum()
+            return jsonify({"acumulado": round(acumulado_recente, 2)})
+        else:
             return jsonify({"error": "Coluna 'Precipitação' não encontrada"}), 404
-
-        acumulado = 0
-        # Itera sobre as linhas, pulando o cabeçalho
-        for row in sheet.iter_rows(min_row=2, values_only=True):
-            valor = row[precipitacao_index]
-            # Verifica se o valor é numérico antes de somar
-            if isinstance(valor, (int, float)):
-                acumulado += valor
-
-        return jsonify({"acumulado": round(acumulado, 2)})
-
     except FileNotFoundError:
         return jsonify({"error": f"Arquivo não encontrado: {os.path.basename(EXCEL_FILE_PLUVIOMETRIA)}"}), 500
     except Exception as e:
