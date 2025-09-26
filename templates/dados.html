@@ -201,21 +201,39 @@
             if (tbody) tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
         }
 
-        function atualizarGrafico(grafico, dadosNaTela, labelKeyOverride = null) {
-            if (!grafico || dadosNaTela.length === 0) return;
-            const dadosParaGrafico = [...dadosNaTela].reverse();
-            const labelKey = labelKeyOverride || Object.keys(dadosParaGrafico[0])[0];
+        // CORREÇÃO: Funções de atualização dos gráficos separadas e mais robustas
+        function atualizarGraficoSensores() {
+            if (!graficoSensores || dadosNaTelaSensores.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaSensores].reverse();
+            const colunas = Object.keys(dadosParaGrafico[0]);
+            const labelKey = colunas[0]; // Assume que a primeira coluna é a de data/hora
+            const dataColumns = colunas.slice(1);
             
-            grafico.data.labels = dadosParaGrafico.map(d => d[labelKey]);
-            grafico.data.datasets.forEach(dataset => {
-                const columnName = dataset.label;
-                dataset.data = dadosParaGrafico.map(d => d[columnName]);
+            graficoSensores.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            
+            dataColumns.forEach((columnName, index) => {
+                if (graficoSensores.data.datasets[index]) {
+                    graficoSensores.data.datasets[index].data = dadosParaGrafico.map(d => d[columnName]);
+                }
             });
-            grafico.update();
+            graficoSensores.update();
         }
 
-        const atualizarGraficoSensores = () => atualizarGrafico(graficoSensores, dadosNaTelaSensores);
-        const atualizarGraficoPluviometria = () => atualizarGrafico(graficoPluviometria, dadosNaTelaPluviometria, 'data_hora');
+        function atualizarGraficoPluviometria() {
+            if (!graficoPluviometria || dadosNaTelaPluviometria.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaPluviometria].reverse();
+            const labelKey = 'data_hora';
+            
+            graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            
+            graficoPluviometria.data.datasets.forEach(dataset => {
+                const columnName = dataset.label;
+                if (columnName !== labelKey) {
+                     dataset.data = dadosParaGrafico.map(d => d[columnName]);
+                }
+            });
+            graficoPluviometria.update();
+        }
         
         // Inicia todo o processo
         iniciarTudo();
