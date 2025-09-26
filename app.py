@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 import pandas as pd
 import os
 import numpy as np
+import openpyxl
 
 app = Flask(__name__)
 
@@ -87,22 +88,37 @@ def pluviometria_iniciais():
 def pluviometria_cabecalho():
     return jsonify(ler_cabecalho_excel(EXCEL_FILE_PLUVIOMETRIA))
 
-# NOVA ROTA: Retorna o valor total do acumulado de chuva
+# ROTA OTIMIZADA: Lê o arquivo de forma eficiente para obter o acumulado total
 @app.route("/ultimo_acumulado")
 def ultimo_acumulado():
     try:
-        df = pd.read_excel(EXCEL_FILE_PLUVIOMETRIA)
-        if 'Precipitação' in df.columns:
-            # Soma todos os valores da coluna, tratando valores não numéricos
-            acumulado = pd.to_numeric(df['Precipitação'], errors='coerce').sum()
-            return jsonify({"acumulado": round(acumulado, 2)})
-        else:
+        workbook = openpyxl.load_workbook(EXCEL_FILE_PLUVIOMETRIA, read_only=True)
+        sheet = workbook.active
+
+        header = [cell.value for cell in sheet[1]]
+        try:
+            precipitacao_index = header.index('Precipitação')
+        except ValueError:
             return jsonify({"error": "Coluna 'Precipitação' não encontrada"}), 404
+
+        acumulado = 0
+        # Itera sobre as linhas, pulando o cabeçalho
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            valor = row[precipitacao_index]
+            # Verifica se o valor é numérico antes de somar
+            if isinstance(valor, (int, float)):
+                acumulado += valor
+
+        return jsonify({"acumulado": round(acumulado, 2)})
+
+    except FileNotFoundError:
+        return jsonify({"error": f"Arquivo não encontrado: {os.path.basename(EXCEL_FILE_PLUVIOMETRIA)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
 
