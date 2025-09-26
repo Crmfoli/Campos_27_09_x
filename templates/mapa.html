@@ -18,8 +18,7 @@
     // Coordenadas fornecidas
     var localizacao = [-22.741620, -45.598395];
 
-    // Cria o mapa com o novo nível de zoom
-    // ALTERAÇÃO: O valor do zoom foi alterado de 15 para 9
+    // Cria o mapa
     var map = L.map('map').setView(localizacao, 9);
 
     // Camada do mapa (OpenStreetMap)
@@ -30,10 +29,35 @@
     // Cria marcador
     var marker = L.marker(localizacao).addTo(map);
 
-    // Texto do marcador
-    marker.bindPopup("<b>Sensor</b><br>Clique para ver os dados.");
+    // Define um popup inicial com mensagem de carregamento
+    marker.bindPopup("<b>Sensor</b><br>A carregar dados de chuva...");
+    marker.openPopup(); // Mostra o popup de carregamento
 
-    // Evento de clique → abre dados
+    // Função para buscar o acumulado de chuva e atualizar o popup
+    async function buscarAcumulado() {
+      try {
+        const response = await fetch('/ultimo_acumulado');
+        const data = await response.json();
+
+        let popupContent = "<b>Sensor</b><br>";
+        if (data.error) {
+          popupContent += `Erro ao carregar chuva: ${data.error}`;
+        } else {
+          popupContent += `Acumulado de chuva: <b>${data.acumulado} mm</b>`;
+        }
+        popupContent += "<br><br><i>Clique no pino para ver os gráficos detalhados.</i>";
+        
+        marker.setPopupContent(popupContent);
+        
+      } catch (error) {
+        marker.setPopupContent("<b>Sensor</b><br>Não foi possível carregar os dados de chuva.<br><br><i>Clique no pino para ver os gráficos detalhados.</i>");
+      }
+    }
+    
+    // Chama a função para buscar os dados
+    buscarAcumulado();
+
+    // Evento de clique no pino → abre a página de dados
     marker.on('click', function () {
       window.open("/dados", "_blank");
     });
