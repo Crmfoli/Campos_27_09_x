@@ -46,7 +46,6 @@ def index():
 def login():
     email = request.form.get("email")
     senha = request.form.get("senha")
-    # ALTERAÇÃO: Validação do token removida
     if email and senha:
         return redirect(url_for("mapa"))
     else:
@@ -88,6 +87,22 @@ def pluviometria_iniciais():
 def pluviometria_cabecalho():
     return jsonify(ler_cabecalho_excel(EXCEL_FILE_PLUVIOMETRIA))
 
+# NOVA ROTA: Retorna o valor total do acumulado de chuva
+@app.route("/ultimo_acumulado")
+def ultimo_acumulado():
+    try:
+        df = pd.read_excel(EXCEL_FILE_PLUVIOMETRIA)
+        if 'Precipitação' in df.columns:
+            # Soma todos os valores da coluna, tratando valores não numéricos
+            acumulado = pd.to_numeric(df['Precipitação'], errors='coerce').sum()
+            return jsonify({"acumulado": round(acumulado, 2)})
+        else:
+            return jsonify({"error": "Coluna 'Precipitação' não encontrada"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
