@@ -10,9 +10,6 @@
         header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
         .container { width: 90%; margin: 20px auto; }
         .grafico-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        table th, table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        table th { background-color: #007bff; color: white; }
         .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
         h2 { text-align: center; color: #333; font-weight: 500; }
     </style>
@@ -31,7 +28,8 @@
             <canvas id="graficoSensores"></canvas>
         </div>
 
-        <div id="tabela-container">
+        <!-- ALTERAÇÃO: Tabela de dados removida -->
+        <div id="tabela-container" style="display: none;">
             <div class="loading">A carregar visualização...</div>
         </div>
     </div>
@@ -50,7 +48,6 @@
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
         
-        // ALTERAÇÃO: Removidos dados de Sucção e Temp_Solo
         const ESTILOS_ESTACAO = {
             'Precipitação': { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', yAxisID: 'y' },
             'Precipitação Acumulada': { type: 'line', color: 'rgb(0, 0, 0)', borderColor: 'rgb(0, 0, 0)', yAxisID: 'y1' }
@@ -86,7 +83,7 @@
                 carregarDadosCompletos();
 
             } catch (error) {
-                document.getElementById("tabela-container").innerHTML = `<div class="loading">Erro ao iniciar: ${error.message}</div>`;
+                console.error("Erro ao iniciar:", error.message);
             }
         }
 
@@ -119,18 +116,12 @@
 
         function iniciarVisualizacaoSensores() {
             const cabecalho = Object.keys(todosOsDadosSensores[0]);
-            criarTabelaComCabecalho(cabecalho);
             iniciarGraficoSensores(cabecalho);
         }
 
         function iniciarVisualizacaoPluviometria() {
             const cabecalho = Object.keys(todosOsDadosPluviometria[0]);
             iniciarGraficoPluviometria(cabecalho);
-        }
-
-        function criarTabelaComCabecalho(colunas) {
-            const container = document.getElementById('tabela-container');
-            container.innerHTML = `<h2>Dados dos Sensores de Umidade</h2><table><thead><tr>${colunas.map(col => `<th>${col}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
         }
 
         function iniciarGraficoSensores(colunas) {
@@ -150,7 +141,6 @@
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
             const labelKey = 'data_hora';
             
-            // ALTERAÇÃO: Filtra apenas as colunas que queremos mostrar
             const dataColumns = colunas.filter(col => ESTILOS_ESTACAO[col]);
 
             const datasets = dataColumns.map(col => {
@@ -168,8 +158,8 @@
                     plugins: { legend: { position: 'bottom' } }, 
                     scales: { 
                         x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
-                        y: { position: 'left', title: { display: true, text: 'Precipitação (mm)' }, beginAtZero: true },
-                        // ALTERAÇÃO: Nome do eixo Y secundário mais específico
+                        // ALTERAÇÃO: Escala do eixo Y da precipitação fixada entre 0 e 5
+                        y: { position: 'left', title: { display: true, text: 'Precipitação (mm)' }, min: 0, max: 5 },
                         y1: { position: 'right', title: { display: true, text: 'Acumulado (mm)' }, beginAtZero: false, grid: { drawOnChartArea: false } }
                     } 
                 },
@@ -193,16 +183,10 @@
                 continuarAnimacao = true;
             }
 
-            renderizarTabelaSensores(); 
             atualizarGraficoSensores();
             atualizarGraficoPluviometria();
 
             if (!continuarAnimacao) clearInterval(intervalId);
-        }
-
-        function renderizarTabelaSensores() {
-            const tbody = document.querySelector("#tabela-container table tbody");
-            if (tbody) tbody.innerHTML = dadosNaTelaSensores.map(linha => `<tr>${Object.values(linha).map(val => `<td>${val === null ? '' : val}</td>`).join('')}</tr>`).join('');
         }
         
         function atualizarGraficoSensores() {
@@ -242,4 +226,3 @@
     </script>
 </body>
 </html>
-
