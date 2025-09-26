@@ -54,8 +54,8 @@
     // Carrega os dados imediatamente ao abrir a página
     buscarAcumulado();
 
-    // ALTERAÇÃO: Atualiza o valor a cada 30 segundos para simular "tempo real"
-    setInterval(buscarAcumulado, 30000); // 30000 ms = 30 segundos
+    // ALTERAÇÃO: Atualiza o valor a cada 2 segundos para simular "tempo real"
+    setInterval(buscarAcumulado, 2000); // 2000 ms = 2 segundos
 
     // Evento de clique no pino → abre a página de dados
     marker.on('click', function () {
