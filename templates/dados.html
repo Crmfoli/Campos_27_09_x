@@ -10,6 +10,10 @@
         header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
         .container { width: 90%; margin: 20px auto; }
         .grafico-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        /* ALTERAÇÃO: Limita a altura máxima dos gráficos */
+        .grafico-container canvas {
+            max-height: 40vh;
+        }
         .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
         h2 { text-align: center; color: #333; font-weight: 500; }
     </style>
@@ -47,7 +51,6 @@
         ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
         
-        // ALTERAÇÃO: Apenas o estilo da precipitação é necessário, o acumulado será gerado dinamicamente
         const ESTILO_PRECIPITACAO = { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)' };
 
         const verticalLinePlugin = {
@@ -122,7 +125,13 @@
             }));
             graficoSensores = new Chart(ctx, {
                 type: 'line', data: { labels: [], datasets: datasets },
-                options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Umidade Volumetrica (%)' } } } },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, // Permite que o CSS controle a altura
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { legend: { position: 'bottom' } }, 
+                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { title: { display: true, text: 'Umidade Volumetrica (%)' } } } 
+                },
                 plugins: [verticalLinePlugin]
             });
         }
@@ -130,7 +139,6 @@
         function iniciarGraficoPluviometria() {
             const ctx = document.getElementById('graficoPluviometria').getContext('2d');
             
-            // ALTERAÇÃO: Define os datasets manualmente
             const datasets = [
                 {
                     label: 'Pluviometria (mm)',
@@ -155,11 +163,12 @@
             graficoPluviometria = new Chart(ctx, {
                 type: 'bar', data: { labels: [], datasets: datasets },
                 options: { 
-                    responsive: true, interaction: { mode: 'index', intersect: false }, 
+                    responsive: true,
+                    maintainAspectRatio: false, // Permite que o CSS controle a altura
+                    interaction: { mode: 'index', intersect: false }, 
                     plugins: { legend: { position: 'bottom' } }, 
                     scales: { 
                         x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
-                        // ALTERAÇÃO: Apenas um eixo Y com escala automática
                         y: { position: 'left', title: { display: true, text: 'Pluviometria (mm)' }, beginAtZero: true }
                     } 
                 },
@@ -213,16 +222,14 @@
             
             graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
             
-            // Atualiza os dados de Pluviometria (barras)
             const datasetPluviometria = graficoPluviometria.data.datasets[0];
             datasetPluviometria.data = dadosParaGrafico.map(d => d['Precipitação']);
 
-            // ALTERAÇÃO: Calcula e atualiza a precipitação acumulada dinamicamente
             const datasetAcumulado = graficoPluviometria.data.datasets[1];
             let acumulado = 0;
             datasetAcumulado.data = dadosParaGrafico.map(d => {
                 acumulado += (d['Precipitação'] || 0);
-                return acumulado.toFixed(2); // Arredonda para 2 casas decimais
+                return acumulado.toFixed(2);
             });
 
             graficoPluviometria.update();
