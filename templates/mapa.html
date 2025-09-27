@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Monitoramento</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { width: 100%; height: 100vh; }
+    
+    /* Estilo do pino (revertido para o original) */
+    .map-tooltip.leaflet-tooltip {
+      background: none;
+      border: none;
+      box-shadow: none;
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #000000;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+    }
+    .map-tooltip.leaflet-tooltip-top::before {
+      border: none !important;
+    }
+
+    /* Estilo para a nova janela de informações */
+    #info-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 280px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 1000; /* Garante que fique sobre o mapa */
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+    }
+    #info-panel h3 {
+        margin: 0;
+        padding: 10px;
+        background-color: #555;
+        color: white;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        font-size: 16px;
+        text-align: center;
+        transition: background-color 0.5s ease; /* Efeito de transição na cor */
+    }
+    #info-panel-content {
+        padding: 15px;
+    }
+    #info-panel p {
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="info-panel">
+        <h3 id="info-panel-header">Status do Monitoramento</h3>
+        <div id="info-panel-content">
+            <p><strong>Nível de Alerta:</strong> <span id="status-nivel">Carregando...</span></p>
+            <p><strong>Chuva Acumulada (72h):</strong> <span id="status-chuva">--</span> mm</p>
+            <p><strong>Umidade Média do Solo:</strong> <span id="status-umidade">--</span></p>
+        </div>
+    </div>
+
+  <script>
+    var localizacao = [-22.741620, -45.598395];
+    var map = L.map('map').setView(localizacao, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    const createIcon = (color) => new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        tooltipAnchor: [0, -41], 
+        shadowSize: [41, 41]
+    });
+
+    // Ícones do pino (revertidos para o original)
+    const greenIcon = createIcon('green');
+    const yellowIcon = createIcon('yellow');
+    const redIcon = createIcon('red');
+    const errorIcon = createIcon('grey');
+
+    var marker = L.marker(localizacao, { icon: greenIcon }).addTo(map);
+    
+    // Tooltip do pino (revertido para o original)
+    marker.bindTooltip("...", { permanent: true, direction: 'top', className: 'map-tooltip', offset: [0, 18] });
+    
+    async function buscarStatusAlerta() {
+      try {
+        const response = await fetch('/api/status_alerta');
+        const data = await response.json();
+
+        if (data.error) {
+            marker.setIcon(errorIcon);
+            marker.getTooltip().setContent('Erro');
+            document.getElementById('status-nivel').innerText = "Erro ao carregar";
+            return;
+        }
+
+        // --- 1. LÓGICA DO PINO (REVERTIDA) ---
+        // A cor do pino é baseada apenas na chuva.
+        const acumulado_chuva = data.acumulado_chuva_72h;
+        let pinoIcon;
+        // Valores de exemplo baseados no app.py (CHUVA_NIVEL_2=40, CHUVA_NIVEL_3=70)
+        if (acumulado_chuva < 40) {
+            pinoIcon = greenIcon;
+        } else if (acumulado_chuva < 70) {
+            pinoIcon = yellowIcon;
+        } else {
+            pinoIcon = redIcon;
+        }
+        marker.setIcon(pinoIcon);
+        // O texto do pino volta a ser apenas o número da chuva.
+        marker.getTooltip().setContent(String(acumulado_chuva));
+
+        // --- 2. LÓGICA DA JANELA DE INFORMAÇÕES (NOVA) ---
+        let nome_nivel;
+        let cor_header;
+        switch (data.nivel_alerta) {
+            case 4:
+                nome_nivel = "Nível 4: Alerta Máximo";
+                cor_header = "#d9534f"; // Vermelho
+                break;
+            case 3:
+                nome_nivel = "Nível 3: Alerta";
+                cor_header = "#f0ad4e"; // Laranja
+                break;
+            case 2:
+                nome_nivel = "Nível 2: Atenção";
+                cor_header = "#f5e050"; // Amarelo
+                break;
+            default:
+                nome_nivel = "Nível 1: Observação";
+                cor_header = "#5bc0de"; // Azul
+        }
+        
+        const umidadeTexto = data.umidade_media_solo !== null 
+            ? `${(data.umidade_media_solo * 100).toFixed(1)}%` 
+            : 'N/A';
+
+        // Atualiza os textos na janela
+        document.getElementById('status-nivel').innerText = nome_nivel;
+        document.getElementById('status-chuva').innerText = acumulado_chuva;
+        document.getElementById('status-umidade').innerText = umidadeTexto;
+        
+        // Atualiza a cor do cabeçalho da janela
+        document.getElementById('info-panel-header').style.backgroundColor = cor_header;
+        
+      } catch (error) {
+        marker.setIcon(errorIcon);
+        marker.getTooltip().setContent('Falha');
+        document.getElementById('status-nivel').innerText = "Falha na conexão";
+      }
+    }
+    
+    buscarStatusAlerta();
+    setInterval(buscarStatusAlerta, 60000);
+
+    marker.on('click', function () {
+      window.open("/dados", "_blank");
+    });
+  </script>
+</body>
+</html>
