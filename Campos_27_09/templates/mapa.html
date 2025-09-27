@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Monitoramento</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { width: 100%; height: 100vh; }
+    
+    /* Estilo base para o tooltip */
+    .map-tooltip.leaflet-tooltip {
+      background: none;
+      border: none;
+      box-shadow: none;
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #000000;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8); /* Sombra para legibilidade */
+    }
+    
+    /* Remove a seta branca do tooltip */
+    .map-tooltip.leaflet-tooltip-top::before {
+      border: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    var localizacao = [-22.741620, -45.598395];
+    var map = L.map('map').setView(localizacao, 9);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // --- ÍCONES PERSONALIZADOS PARA OS NÍVEIS DE ALERTA ---
+    const createIcon = (color) => new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        // Posição da "âncora" do tooltip. [0, -41] coloca a base do tooltip no topo do pino.
+        tooltipAnchor: [0, -41], 
+        shadowSize: [41, 41]
+    });
+
+    const greenIcon = createIcon('green');
+    const yellowIcon = createIcon('yellow');
+    const redIcon = createIcon('red');
+
+    var marker = L.marker(localizacao, { icon: greenIcon }).addTo(map);
+    
+    // LIGA O TEXTO AO MARCADOR
+    // permanent: true -> para ficar sempre visível
+    // direction: 'top' -> para aparecer em cima
+    // className: 'map-tooltip' -> para aplicar o nosso estilo
+    // offset: [0, 18] -> o ajuste fino que "puxa" o texto para baixo, eliminando o espaço
+    marker.bindTooltip("...", { permanent: true, direction: 'top', className: 'map-tooltip', offset: [0, 18] });
+    
+    async function buscarAcumulado72h() {
+      try {
+        const response = await fetch('/acumulado_72h');
+        const data = await response.json();
+
+        if (data.error) {
+            marker.getTooltip().setContent('Erro');
+            return;
+        }
+
+        const acumulado = data.acumulado_72h;
+
+        let icon;
+        const LIMITE_BAIXO = 10;
+        const LIMITE_MEDIO = 40;
+
+        if (acumulado <= LIMITE_BAIXO) {
+            icon = greenIcon;
+        } else if (acumulado <= LIMITE_MEDIO) {
+            icon = yellowIcon;
+        } else {
+            icon = redIcon;
+        }
+
+        marker.setIcon(icon);
+
+        const tooltip = marker.getTooltip();
+        if (tooltip) {
+            tooltip.setContent(String(acumulado));
+        }
+        
+      } catch (error) {
+        marker.getTooltip().setContent('Falha');
+      }
+    }
+    
+    // Carrega o dado inicial e atualiza a cada 1 minuto
+    buscarAcumulado72h();
+    setInterval(buscarAcumulado72h, 60000);
+
+    marker.on('click', function () {
+      window.open("/dados", "_blank");
+    });
+  </script>
+</body>
+</html>
+

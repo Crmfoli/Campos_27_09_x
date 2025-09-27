@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dados dos Sensores</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
+        header { background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 22px; }
+        .container { width: 90%; margin: 20px auto; }
+        /* Estilo para o título dentro de cada gráfico */
+        .info-header {
+            text-align: center;
+            margin-bottom: 15px; /* Reduzido o espaçamento inferior */
+        }
+        .info-header h2 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+        }
+        .info-header p {
+            margin: 4px 0 0;
+            font-size: 1em;
+            color: #555;
+        }
+        .grafico-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .grafico-container canvas {
+            max-height: 50vh; /* ALTERAÇÃO: Aumentado para 50% */
+        }
+        .loading { text-align: center; padding: 20px; font-size: 18px; color: #333; }
+    </style>
+</head>
+<body>
+    <header>ESTAÇÕES GEOTÉCNICAS</header> <!-- ALTERAÇÃO: Título principal alterado -->
+
+    <div class="container">
+        <div class="grafico-container">
+            <!-- Título movido para dentro do contêiner do gráfico -->
+            <div class="info-header">
+                <h2>Município: CAMPOS DO JORDÃO/SP</h2>
+                <p>Estação: Vila Abernéssia</p>
+            </div>
+            <canvas id="graficoPluviometria"></canvas>
+        </div>
+
+        <div class="grafico-container">
+             <!-- Título movido para dentro do contêiner do gráfico -->
+            <div class="info-header">
+                <h2>Município: CAMPOS DO JORDÃO/SP</h2>
+                <p>Estação: Vila Abernéssia</p>
+            </div>
+            <canvas id="graficoSensores"></canvas>
+        </div>
+
+        <div id="tabela-container" style="display: none;">
+            <div class="loading">A carregar visualização...</div>
+        </div>
+    </div>
+
+    <script>
+        // --- Variáveis Globais ---
+        let todosOsDadosSensores = [], indiceAtualSensores = 0, dadosNaTelaSensores = [], graficoSensores = null;
+        let todosOsDadosPluviometria = [], indiceAtualPluviometria = 0, dadosNaTelaPluviometria = [], graficoPluviometria = null;
+        let intervalId = null;
+
+        // --- Configurações de Estilo dos Gráficos ---
+        const ESTILOS_SENSORES = [
+            { color: 'rgb(128, 0, 128)', pointStyle: 'circle' }, { color: 'rgb(0, 0, 255)', pointStyle: 'circle' },
+            { color: 'rgb(0, 128, 0)', pointStyle: 'rect' }, { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' },
+            { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' }, { color: 'rgb(255, 0, 255)', pointStyle: 'star' }
+        ];
+        const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
+        
+        const ESTILO_PRECIPITACAO = { type: 'bar', color: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)' };
+
+        const verticalLinePlugin = {
+          id: 'verticalLine',
+          afterDraw: (chart) => { if (chart.tooltip?._active?.length) { const ctx = chart.ctx; const x = chart.tooltip._active[0].element.x; const topY = chart.scales.y.top; const bottomY = chart.scales.y.bottom; ctx.save(); ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; ctx.stroke(); ctx.restore(); } }
+        };
+        
+        // --- LÓGICA DE CARREGAMENTO OTIMIZADA ---
+
+        async function iniciarTudo() {
+            try {
+                const [respIniciaisSensores, respIniciaisPluviometria] = await Promise.all([
+                    fetch("/dados_iniciais"),
+                    fetch("/pluviometria_iniciais")
+                ]);
+                todosOsDadosSensores = await respIniciaisSensores.json();
+                todosOsDadosPluviometria = await respIniciaisPluviometria.json();
+
+                if (todosOsDadosSensores.error || todosOsDadosPluviometria.error) throw new Error(todosOsDadosSensores.error || todosOsDadosPluviometria.error);
+                if (todosOsDadosSensores.length === 0 || todosOsDadosPluviometria.length === 0) throw new Error("Os arquivos de dados iniciais estão vazios.");
+
+                iniciarVisualizacaoSensores();
+                iniciarVisualizacaoPluviometria();
+                intervalId = setInterval(adicionarProximoDado, 2000);
+
+                carregarDadosCompletos();
+
+            } catch (error) {
+                console.error("Erro ao iniciar:", error.message);
+            }
+        }
+
+        async function carregarDadosCompletos() {
+            try {
+                const [respCompletosSensores, respCompletosPluviometria] = await Promise.all([
+                    fetch("/dados_json"),
+                    fetch("/pluviometria_json")
+                ]);
+                const dadosCompletosSensores = await respCompletosSensores.json();
+                const dadosCompletosPluviometria = await respCompletosPluviometria.json();
+
+                if (dadosCompletosSensores.error || dadosCompletosPluviometria.error) {
+                    console.error("Erro ao buscar dados completos:", dadosCompletosSensores.error || dadosCompletosPluviometria.error);
+                    return;
+                }
+                
+                todosOsDadosSensores = dadosCompletosSensores;
+                todosOsDadosPluviometria = dadosCompletosPluviometria;
+                console.log("Dados completos carregados em segundo plano.");
+
+            } catch (error) {
+                 console.error("Falha ao carregar dados completos em segundo plano:", error);
+            }
+        }
+
+        // --- Funções de Inicialização dos Gráficos ---
+
+        function iniciarVisualizacaoSensores() {
+            const cabecalho = Object.keys(todosOsDadosSensores[0]);
+            iniciarGraficoSensores(cabecalho);
+        }
+
+        function iniciarVisualizacaoPluviometria() {
+            iniciarGraficoPluviometria();
+        }
+
+        function iniciarGraficoSensores(colunas) {
+            const ctx = document.getElementById('graficoSensores').getContext('2d');
+            const datasets = colunas.slice(1).map((col, i) => ({
+                label: LABELS_PROFUNDIDADE[i] || col, data: [], borderColor: ESTILOS_SENSORES[i].color, backgroundColor: ESTILOS_SENSORES[i].color,
+                pointStyle: ESTILOS_SENSORES[i].pointStyle, pointRadius: 5, tension: 0.1, fill: false
+            }));
+            graficoSensores = new Chart(ctx, {
+                type: 'line', data: { labels: [], datasets: datasets },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { 
+                        legend: { position: 'bottom' },
+                        // ALTERAÇÃO: Formata o tooltip para exibir porcentagem
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) {
+                                        label += (context.parsed.y * 100).toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
+                        y: { 
+                            title: { display: true, text: 'Umidade Volumetrica (%)' },
+                            // ALTERAÇÃO: Formata o eixo Y para exibir porcentagem
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100).toFixed(0) + '%';
+                                }
+                            }
+                        } 
+                    } 
+                },
+                plugins: [verticalLinePlugin]
+            });
+        }
+
+        function iniciarGraficoPluviometria() {
+            const ctx = document.getElementById('graficoPluviometria').getContext('2d');
+            
+            const datasets = [
+                {
+                    label: 'Pluviometria (mm)',
+                    data: [],
+                    type: ESTILO_PRECIPITACAO.type,
+                    backgroundColor: ESTILO_PRECIPITACAO.color,
+                    borderColor: ESTILO_PRECIPITACAO.borderColor
+                },
+                {
+                    label: 'Precipitação Acumulada (mm)',
+                    data: [],
+                    type: 'line',
+                    borderColor: 'rgb(0, 0, 0)',
+                    backgroundColor: 'rgb(0, 0, 0)',
+                    pointStyle: 'circle',
+                    pointRadius: 4,
+                    tension: 0.1,
+                    fill: false
+                }
+            ];
+
+            graficoPluviometria = new Chart(ctx, {
+                type: 'bar', data: { labels: [], datasets: datasets },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { legend: { position: 'bottom' } }, 
+                    scales: { 
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }, 
+                        y: { position: 'left', title: { display: true, text: 'Pluviometria (mm)' }, beginAtZero: true }
+                    } 
+                },
+                plugins: [verticalLinePlugin]
+            });
+        }
+
+        // --- Funções de Atualização (Loop Principal) ---
+
+        function adicionarProximoDado() {
+            let continuarAnimacao = false;
+            
+            if (indiceAtualSensores < todosOsDadosSensores.length) {
+                dadosNaTelaSensores.unshift(todosOsDadosSensores[indiceAtualSensores++]); 
+                if (dadosNaTelaSensores.length > 10) dadosNaTelaSensores.pop();
+                continuarAnimacao = true;
+            }
+            if (indiceAtualPluviometria < todosOsDadosPluviometria.length) {
+                dadosNaTelaPluviometria.unshift(todosOsDadosPluviometria[indiceAtualPluviometria++]);
+                if (dadosNaTelaPluviometria.length > 10) dadosNaTelaPluviometria.pop();
+                continuarAnimacao = true;
+            }
+
+            atualizarGraficoSensores();
+            atualizarGraficoPluviometria();
+
+            if (!continuarAnimacao) clearInterval(intervalId);
+        }
+        
+        function atualizarGraficoSensores() {
+            if (!graficoSensores || dadosNaTelaSensores.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaSensores].reverse();
+            const colunas = Object.keys(dadosParaGrafico[0]);
+            const labelKey = colunas[0]; 
+            const dataColumns = colunas.slice(1);
+            
+            graficoSensores.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            
+            dataColumns.forEach((columnName, index) => {
+                if (graficoSensores.data.datasets[index]) {
+                    graficoSensores.data.datasets[index].data = dadosParaGrafico.map(d => d[columnName]);
+                }
+            });
+            graficoSensores.update();
+        }
+
+        function atualizarGraficoPluviometria() {
+            if (!graficoPluviometria || dadosNaTelaPluviometria.length === 0) return;
+            const dadosParaGrafico = [...dadosNaTelaPluviometria].reverse();
+            const labelKey = 'data_hora';
+            
+            graficoPluviometria.data.labels = dadosParaGrafico.map(d => d[labelKey]);
+            
+            const datasetPluviometria = graficoPluviometria.data.datasets[0];
+            datasetPluviometria.data = dadosParaGrafico.map(d => d['Precipitação']);
+
+            const datasetAcumulado = graficoPluviometria.data.datasets[1];
+            let acumulado = 0;
+            datasetAcumulado.data = dadosParaGrafico.map(d => {
+                acumulado += (d['Precipitação'] || 0);
+                return acumulado.toFixed(2);
+            });
+
+            graficoPluviometria.update();
+        }
+        
+        iniciarTudo();
+    </script>
+</body>
+</html>
