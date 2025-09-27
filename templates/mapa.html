@@ -9,15 +9,21 @@
   <style>
     body { margin: 0; padding: 0; }
     #map { width: 100%; height: 100vh; }
-    /* Estilo para a tooltip minimalista */
-    .leaflet-tooltip-permanent {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        font-size: 1.2em;
-        font-weight: bold;
-        color: black;
-        text-shadow: 1px 1px 2px white; /* Sombra para melhorar a legibilidade */
+    
+    /* Estilo base para o tooltip */
+    .map-tooltip.leaflet-tooltip {
+      background: none;
+      border: none;
+      box-shadow: none;
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #000000;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8); /* Sombra para legibilidade */
+    }
+    
+    /* Remove a seta branca do tooltip */
+    .map-tooltip.leaflet-tooltip-top::before {
+      border: none !important;
     }
   </style>
 </head>
@@ -32,46 +38,74 @@
       maxZoom: 19
     }).addTo(map);
 
-    var marker = L.marker(localizacao).addTo(map);
+    // --- ÍCONES PERSONALIZADOS PARA OS NÍVEIS DE ALERTA ---
+    const createIcon = (color) => new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        // Posição da "âncora" do tooltip. [0, -41] coloca a base do tooltip no topo do pino.
+        tooltipAnchor: [0, -41], 
+        shadowSize: [41, 41]
+    });
 
-    // ALTERAÇÃO: Usa uma tooltip permanente em vez de um popup
-    marker.bindTooltip("...", { permanent: true, direction: 'top', offset: [0, -10] }).openTooltip();
+    const greenIcon = createIcon('green');
+    const yellowIcon = createIcon('yellow');
+    const redIcon = createIcon('red');
 
-    /**
-     * Função especialista para buscar e exibir o acumulado de chuva das últimas 72 horas.
-     */
+    var marker = L.marker(localizacao, { icon: greenIcon }).addTo(map);
+    
+    // LIGA O TEXTO AO MARCADOR
+    // permanent: true -> para ficar sempre visível
+    // direction: 'top' -> para aparecer em cima
+    // className: 'map-tooltip' -> para aplicar o nosso estilo
+    // offset: [0, 18] -> o ajuste fino que "puxa" o texto para baixo, eliminando o espaço
+    marker.bindTooltip("...", { permanent: true, direction: 'top', className: 'map-tooltip', offset: [0, 18] });
+    
     async function buscarAcumulado72h() {
       try {
         const response = await fetch('/acumulado_72h');
         const data = await response.json();
 
-        let tooltipContent = ""; // Começa com o conteúdo vazio
         if (data.error) {
-          tooltipContent = "Erro"; // Exibe "Erro" se houver falha
+            marker.getTooltip().setContent('Erro');
+            return;
+        }
+
+        const acumulado = data.acumulado_72h;
+
+        let icon;
+        const LIMITE_BAIXO = 10;
+        const LIMITE_MEDIO = 40;
+
+        if (acumulado <= LIMITE_BAIXO) {
+            icon = greenIcon;
+        } else if (acumulado <= LIMITE_MEDIO) {
+            icon = yellowIcon;
         } else {
-          // ALTERAÇÃO: Mostra apenas o número bruto, sem texto ou unidade
-          tooltipContent = `${data.acumulado_72h}`; 
+            icon = redIcon;
+        }
+
+        marker.setIcon(icon);
+
+        const tooltip = marker.getTooltip();
+        if (tooltip) {
+            tooltip.setContent(String(acumulado));
         }
         
-        marker.setTooltipContent(tooltipContent);
-        
       } catch (error) {
-        marker.setTooltipContent(`-`); // Exibe um traço em caso de falha de conexão
+        marker.getTooltip().setContent('Falha');
       }
     }
     
-    // Carrega o dado inicial assim que a página abre
+    // Carrega o dado inicial e atualiza a cada 1 minuto
     buscarAcumulado72h();
-
-    // Configura um intervalo para atualizar o dado a cada 1 minuto (60000 ms)
     setInterval(buscarAcumulado72h, 60000);
 
-    // O evento de clique continua funcionando para abrir os gráficos
     marker.on('click', function () {
       window.open("/dados", "_blank");
     });
   </script>
 </body>
 </html>
-
 
