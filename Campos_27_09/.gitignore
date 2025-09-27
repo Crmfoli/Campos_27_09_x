@@ -1,0 +1,6 @@
+# 1. IGNORA TUDO NA RAIZ DO PROJETO
+*
+
+# 2. EXCEÇÕES (arquivos que VOCÊ QUER manter)
+!.gitignore
+!Campos_27_09/
