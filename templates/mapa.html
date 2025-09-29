@@ -41,8 +41,29 @@
 
   <script>
     var localizacao = [-22.741620, -45.598395];
-    var map = L.map('map').setView(localizacao, 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    
+    var streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    });
+
+    var satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri'
+    });
+
+    var map = L.map('map', {
+        center: localizacao,
+        zoom: 13,
+        layers: [streetMap]
+    });
+
+    var baseMaps = {
+        "Ruas": streetMap,
+        "Satélite": satelliteMap
+    };
+
+    L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
     const createIcon = (color) => new L.Icon({
         iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
@@ -50,17 +71,18 @@
         iconSize: [25, 41], iconAnchor: [12, 41], tooltipAnchor: [0, -41], shadowSize: [41, 41]
     });
 
-    const obsIcon     = createIcon('green');
-    const atencaoIcon = createIcon('yellow');
-    const alertaIcon  = createIcon('red');
-    const maximoIcon  = createIcon('violet');
-    const errorIcon   = createIcon('grey');
+    const obsIcon      = createIcon('green');
+    const atencaoIcon  = createIcon('yellow');
+    const alertaIcon   = createIcon('red');
+    const maximoIcon   = createIcon('violet');
+    const errorIcon    = createIcon('grey');
 
     var marker = L.marker(localizacao, { icon: obsIcon }).addTo(map);
     marker.bindTooltip("...", { permanent: true, direction: 'top', className: 'map-tooltip', offset: [0, 18] });
     
     let totalPontos = 0, indiceSimulacao = 0, simInterval = null;
-    const VELOCIDADE_SIMULACAO = 2000 / 144; 
+    let dadosWindow = null, checkWindowInterval = null; 
+    const VELOCIDADE_SIMULACAO = 2000 / 144; // Velocidade original restaurada
 
     function formatarDataBR(dataStr) {
         if (!dataStr) return '';
@@ -70,13 +92,23 @@
         return `${dia}/${mes}/${ano} ${h}:${m}`;
     }
 
+    function startOrResumeSimulation() {
+        if (simInterval) clearInterval(simInterval);
+        if (indiceSimulacao < totalPontos) {
+            simInterval = setInterval(avancarSimulacao, VELOCIDADE_SIMULACAO);
+        }
+    }
+
     async function iniciarSimulacao() {
         try {
             const infoResponse = await fetch('/api/info_simulacao');
             const infoData = await infoResponse.json();
             totalPontos = infoData.total_pontos;
-            if (totalPontos > 0) simInterval = setInterval(avancarSimulacao, VELOCIDADE_SIMULACAO);
-            else document.getElementById('header-text').innerText = "Sem dados.";
+            if (totalPontos > 0) {
+                startOrResumeSimulation();
+            } else {
+                document.getElementById('header-text').innerText = "Sem dados.";
+            }
         } catch (e) { document.getElementById('header-text').innerText = "Erro ao iniciar."; }
     }
 
@@ -162,8 +194,24 @@
     document.addEventListener('DOMContentLoaded', iniciarSimulacao);
 
     marker.on('click', function () {
-      window.open("/dados", "_blank");
+        if (simInterval) {
+            clearInterval(simInterval);
+            simInterval = null;
+        }
+
+        const url = `/dados?indice=${indiceSimulacao > 0 ? indiceSimulacao - 1 : 0}`;
+        dadosWindow = window.open(url, "_blank");
+
+        if (checkWindowInterval) clearInterval(checkWindowInterval);
+        checkWindowInterval = setInterval(() => {
+            if (dadosWindow && dadosWindow.closed) {
+                clearInterval(checkWindowInterval);
+                checkWindowInterval = null;
+                startOrResumeSimulation();
+            }
+        }, 500);
     });
   </script>
 </body>
 </html>
+
