@@ -66,7 +66,11 @@ def login(): return redirect(url_for("mapa"))
 def mapa(): return render_template("mapa.html")
 
 @app.route("/dados")
-def dados(): return render_template("dados.html")
+def dados():
+    # Captura o índice da simulação passado como parâmetro na URL
+    indice = request.args.get('indice', default=None)
+    # Envia o índice para o template poder usá-lo no JavaScript
+    return render_template("dados.html", indice_simulacao=indice)
 
 # --- API ---
 @app.route("/api/info_simulacao")
@@ -121,3 +125,4 @@ def pluviometria_json():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
