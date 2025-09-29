@@ -18,15 +18,38 @@
         .filter-container { margin-bottom: 20px; }
         .filter-container label { font-weight: bold; margin-right: 10px; }
         .filter-container select { padding: 5px; font-size: 1em; border-radius: 4px; }
+        /* Estilos para o botão de voltar */
+        .nav-container {
+            margin-bottom: 20px;
+            text-align: right;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color: 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <header>ESTAÇÕES GEOTÉCNICAS</header>
     <div class="container">
+        <!-- Botão para voltar ao mapa -->
+        <div class="nav-container">
+            <button id="voltar-btn" class="btn">Voltar ao Mapa e Continuar</button>
+        </div>
+
         <div class="grafico-container" id="pluviometria-container">
             <div class="filter-container">
                 <label for="periodo-filtro-pluviometria">Período:</label>
-                <select id="periodo-filtro-pluviometria"><option value="1">1 hora</option><option value="3">3 horas</option><option value="6">6 horas</option><option value="12">12 horas</option><option value="24" selected>24 horas</option><option value="48">48 horas</option><option value="72">72 horas</option><option value="96">96 horas</option></select>
+                <select id="periodo-filtro-pluviometria"><option value="1">1 hora</option><option value="3">3 horas</option><option value="6">6 horas</option><option value="12">12 horas</option><option value="24">24 horas</option><option value="48">48 horas</option><option value="72" selected>72 horas</option><option value="96">96 horas</option></select>
             </div>
             <div class="info-header"><h2>Município: CAMPOS DO JORDÃO/SP</h2><p>Estação: Vila Abernéssia</p></div>
             <canvas id="graficoPluviometria"></canvas>
@@ -35,7 +58,7 @@
         <div class="grafico-container" id="sensores-container">
             <div class="filter-container">
                 <label for="periodo-filtro-sensores">Período:</label>
-                <select id="periodo-filtro-sensores"><option value="1">1 hora</option><option value="3">3 horas</option><option value="6">6 horas</option><option value="12">12 horas</option><option value="24" selected>24 horas</option><option value="48">48 horas</option><option value="72">72 horas</option><option value="96">96 horas</option></select>
+                <select id="periodo-filtro-sensores"><option value="1">1 hora</option><option value="3">3 horas</option><option value="6">6 horas</option><option value="12">12 horas</option><option value="24">24 horas</option><option value="48">48 horas</option><option value="72" selected>72 horas</option><option value="96">96 horas</option></select>
             </div>
             <div class="info-header"><h2>Município: CAMPOS DO JORDÃO/SP</h2><p>Estação: Vila Abernéssia</p></div>
             <canvas id="graficoSensores"></canvas>
@@ -45,6 +68,7 @@
     <script>
         let graficoSensores, graficoPluviometria;
         let todosOsDadosSensores = [], todosOsDadosPluviometria = [];
+        const indiceSimulacao = {{ indice_simulacao|default('null') }};
         
         const ESTILOS_SENSORES = [ { color: 'rgb(128, 0, 128)', pointStyle: 'circle' }, { color: 'rgb(0, 0, 255)', pointStyle: 'circle' }, { color: 'rgb(0, 128, 0)', pointStyle: 'rect' }, { color: 'rgb(255, 165, 0)', pointStyle: 'triangle' }, { color: 'rgb(255, 0, 0)', pointStyle: 'rectRot' }, { color: 'rgb(255, 0, 255)', pointStyle: 'star' } ];
         const LABELS_PROFUNDIDADE = ['Profundidade 0,3 m', 'Profundidade 0,8 m', 'Profundidade 1,5 m', 'Profundidade 2,0 m', 'Profundidade 2,5 m'];
@@ -62,8 +86,17 @@
         async function carregarDadosIniciais() {
             try {
                 const [respSensores, respPluviometria] = await Promise.all([fetch("/dados_json"), fetch("/pluviometria_json")]);
-                todosOsDadosSensores = await respSensores.json(); 
-                todosOsDadosPluviometria = await respPluviometria.json();
+                let dadosSensoresCompletos = await respSensores.json(); 
+                let dadosPluviometriaCompletos = await respPluviometria.json();
+
+                if (indiceSimulacao !== null && indiceSimulacao >= 0) {
+                    todosOsDadosSensores = dadosSensoresCompletos.slice(0, indiceSimulacao + 1);
+                    todosOsDadosPluviometria = dadosPluviometriaCompletos.slice(0, indiceSimulacao + 1);
+                } else {
+                    todosOsDadosSensores = dadosSensoresCompletos;
+                    todosOsDadosPluviometria = dadosPluviometriaCompletos;
+                }
+
                 if (todosOsDadosSensores.length === 0) throw new Error("Dados não encontrados.");
                 iniciarGraficos(); 
                 atualizarGraficoPluviometria();
@@ -73,15 +106,23 @@
 
         function atualizarGraficoPluviometria() {
             const horas = parseInt(document.getElementById('periodo-filtro-pluviometria').value);
-            const dadosHorasCheias = todosOsDadosPluviometria.filter(d => new Date(d.data_hora).getMinutes() === 0);
-            const dadosFinais = dadosHorasCheias.slice(-horas);
+            if (todosOsDadosPluviometria.length === 0) return;
+
+            const dataFinal = new Date(todosOsDadosPluviometria[todosOsDadosPluviometria.length - 1].data_hora);
+            const limiteInferior = new Date(dataFinal.getTime() - horas * 60 * 60 * 1000);
+            const dadosFinais = todosOsDadosPluviometria.filter(d => new Date(d.data_hora) >= limiteInferior);
+            
             renderizarGraficoPluviometria(dadosFinais);
         }
 
         function atualizarGraficoSensores() {
             const horas = parseInt(document.getElementById('periodo-filtro-sensores').value);
-            const dadosHorasCheias = todosOsDadosSensores.filter(d => new Date(d.data_hora).getMinutes() === 0);
-            const dadosFinais = dadosHorasCheias.slice(-horas);
+            if (todosOsDadosSensores.length === 0) return;
+            
+            const dataFinal = new Date(todosOsDadosSensores[todosOsDadosSensores.length - 1].data_hora);
+            const limiteInferior = new Date(dataFinal.getTime() - horas * 60 * 60 * 1000);
+            const dadosFinais = todosOsDadosSensores.filter(d => new Date(d.data_hora) >= limiteInferior);
+
             renderizarGraficoSensores(dadosFinais);
         }
 
@@ -107,17 +148,36 @@
         function renderizarGraficoPluviometria(dados) {
             document.getElementById('loading-pluviometria').style.display = 'none';
             const labels = dados.map(d => formatarDataBR(d.data_hora));
-            let acumulado = 0;
-            const datasets = [dados.map(d => d['Precipitação']), dados.map(d => { acumulado += (d['Precipitação'] || 0); return acumulado.toFixed(2); })];
+            
+            let acumuladoVisivel = 0;
+            const dadosAcumuladosVisiveis = dados.map(d => {
+                acumuladoVisivel += (d['Precipitação'] || 0);
+                return acumuladoVisivel.toFixed(2);
+            });
+
+            const datasets = [
+                dados.map(d => d['Precipitação']),
+                dadosAcumuladosVisiveis
+            ];
+
             renderizarGrafico(graficoPluviometria, dados, labels, datasets);
         }
 
         function iniciarGraficos() {
             const ctxSensores = document.getElementById('graficoSensores').getContext('2d');
-            graficoSensores = new Chart(ctxSensores, { type: 'line', data: { datasets: LABELS_PROFUNDIDADE.map((l, i) => ({ label: l, borderColor: ESTILOS_SENSORES[i].color, backgroundColor: ESTILOS_SENSORES[i].color, pointStyle: ESTILOS_SENSORES[i].pointStyle, pointRadius: 5, tension: 0.1 }))}, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${(ctx.parsed.y * 100).toFixed(2)}%` }}}, scales: { y: { title: { display: true, text: 'Umidade Volumetrica (%)' }, ticks: { callback: (val) => `${(val * 100).toFixed(0)}%` }}} }, plugins: [verticalLinePlugin] });
+            graficoSensores = new Chart(ctxSensores, { type: 'line', data: { datasets: LABELS_PROFUNDIDADE.map((l, i) => ({ label: l, borderColor: ESTILOS_SENSORES[i].color, backgroundColor: ESTILOS_SENSORES[i].color, pointRadius: 0, pointHoverRadius: 5, tension: 0.1 }))}, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${(ctx.parsed.y * 100).toFixed(2)}%` }}}, scales: { y: { title: { display: true, text: 'Umidade Volumetrica (%)' }, ticks: { callback: (val) => `${(val * 100).toFixed(0)}%` }}} }, plugins: [verticalLinePlugin] });
+            
             const ctxPluviometria = document.getElementById('graficoPluviometria').getContext('2d');
-            graficoPluviometria = new Chart(ctxPluviometria, { type: 'bar', data: { datasets: [ { label: 'Pluviometria (mm)', type: 'bar', backgroundColor: ESTILO_PRECIPITACAO.color }, { label: 'Precipitação Acumulada (mm)', type: 'line', borderColor: 'rgb(0,0,0)', pointRadius: 4, tension: 0.1 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Pluviometria (mm)' } } } }, plugins: [verticalLinePlugin] });
+            graficoPluviometria = new Chart(ctxPluviometria, { type: 'bar', data: { datasets: [ 
+                { label: 'Pluviometria (mm)', type: 'bar', backgroundColor: ESTILO_PRECIPITACAO.color }, 
+                { label: 'Precipitação Acumulada no Período', type: 'line', borderColor: 'rgb(0,0,0)', pointRadius: 0, pointHoverRadius: 5, tension: 0.1 } 
+            ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Pluviometria (mm)' } } } }, plugins: [verticalLinePlugin] });
         }
+
+        // Adiciona o evento de clique ao botão de voltar
+        document.getElementById('voltar-btn').addEventListener('click', () => {
+            window.close(); // Simplesmente fecha a janela/aba
+        });
 
         document.addEventListener('DOMContentLoaded', carregarDadosIniciais);
         document.getElementById('periodo-filtro-pluviometria').addEventListener('change', atualizarGraficoPluviometria);
@@ -125,3 +185,4 @@
     </script>
 </body>
 </html>
+
